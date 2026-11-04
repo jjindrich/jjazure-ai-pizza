@@ -1,0 +1,10 @@
+.azure/
+**/bin/
+**/obj/
+src/Pizza.Web/App_Data/
+src/Pizza.Web/container-publish/
+.env
+.env.*
+!.env.example
+*.user
+*.suo

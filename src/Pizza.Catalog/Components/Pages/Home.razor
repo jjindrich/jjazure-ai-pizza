@@ -1,0 +1,172 @@
+@page "/"
+@inject PizzaCatalogService Catalog
+@inject IPizzaImageStore Images
+
+<PageTitle>Pizza menu</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">FRESH FROM THE OVEN</p>
+        <h1>Pizza menu</h1>
+        <p class="text-secondary">Browse the menu or manage the pizzas available to customers.</p>
+    </div>
+    <span class="menu-count">@Pizzas.Count pizzas</span>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert @(IsError ? "alert-danger" : "alert-success")" role="status">@Message</div>
+}
+
+<section class="pizza-grid">
+    @foreach (var pizza in Pizzas)
+    {
+        <article class="pizza-card">
+            <img src="@pizza.ImageUrl" alt="@pizza.Name" class="pizza-image" />
+            <div class="pizza-card-content">
+                <div class="pizza-card-title">
+                    <h2>@pizza.Name</h2>
+                    <span class="price">@pizza.Price.ToString("C")</span>
+                </div>
+                <p>@pizza.Description</p>
+                <div class="card-actions">
+                    <span class="availability @(pizza.IsAvailable ? "available" : "unavailable")">
+                        @(pizza.IsAvailable ? "Available" : "Not available")
+                    </span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Edit(pizza)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(pizza.Id)">Delete</button>
+                </div>
+                <label class="image-upload">
+                    <span>Change photo</span>
+                    <InputFile accept="image/jpeg,image/png,image/webp" OnChange="args => UploadImageAsync(pizza.Id, args)" />
+                </label>
+            </div>
+        </article>
+    }
+</section>
+
+<section class="management-panel">
+    <h2>@(EditingId is null ? "Add a pizza" : "Edit pizza")</h2>
+    <EditForm Model="this" OnValidSubmit="SaveAsync">
+        <div class="form-grid">
+            <label>
+                Name
+                <InputText @bind-Value="Name" class="form-control" maxlength="100" />
+            </label>
+            <label>
+                Price
+                <InputNumber @bind-Value="Price" class="form-control" min="0.01" step="0.01" />
+            </label>
+            <label class="wide-field">
+                Ingredients and description
+                <InputTextArea @bind-Value="Description" class="form-control" maxlength="500" rows="2" />
+            </label>
+            <label class="checkbox-field">
+                <InputCheckbox @bind-Value="IsAvailable" />
+                Available to order
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">@(EditingId is null ? "Add pizza" : "Save changes")</button>
+            @if (EditingId is not null)
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">Cancel</button>
+            }
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private IReadOnlyList<PizzaItem> Pizzas = [];
+    private Guid? EditingId;
+    private string Name = "";
+    private string Description = "";
+    private decimal Price = 10;
+    private bool IsAvailable = true;
+    private string? Message;
+    private bool IsError;
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    private async Task ReloadAsync() =>
+        Pizzas = await Catalog.GetAllAsync(CancellationToken.None);
+
+    private void Edit(PizzaItem pizza)
+    {
+        EditingId = pizza.Id;
+        Name = pizza.Name;
+        Description = pizza.Description;
+        Price = pizza.Price;
+        IsAvailable = pizza.IsAvailable;
+        Message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            var request = new PizzaUpsertRequest(Name, Description, Price, IsAvailable);
+            if (EditingId is Guid id)
+            {
+                await Catalog.UpdateAsync(id, request, CancellationToken.None);
+                Message = "Pizza updated.";
+            }
+            else
+            {
+                await Catalog.CreateAsync(request, CancellationToken.None);
+                Message = "Pizza added.";
+            }
+
+            IsError = false;
+            ResetForm();
+            await ReloadAsync();
+        }
+        catch (CatalogValidationException exception)
+        {
+            ShowError(exception.Message);
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        await Catalog.DeleteAsync(id, CancellationToken.None);
+        Message = "Pizza deleted.";
+        IsError = false;
+        await ReloadAsync();
+    }
+
+    private async Task UploadImageAsync(Guid id, InputFileChangeEventArgs args)
+    {
+        try
+        {
+            var file = args.File;
+            await using var source = file.OpenReadStream(5 * 1024 * 1024);
+            var bytes = await ImageFilePolicy.ReadValidatedAsync(source, file.ContentType, CancellationToken.None);
+            await using var stream = new MemoryStream(bytes, writable: false);
+            var key = await Images.SaveAsync(stream, file.ContentType, CancellationToken.None);
+            await Catalog.SetImageAsync(id, $"/api/catalog/images/{key}", CancellationToken.None);
+            Message = "Pizza photo updated.";
+            IsError = false;
+            await ReloadAsync();
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException)
+        {
+            ShowError(exception.Message);
+        }
+    }
+
+    private void ResetForm()
+    {
+        EditingId = null;
+        Name = "";
+        Description = "";
+        Price = 10;
+        IsAvailable = true;
+    }
+
+    private void ShowError(string message)
+    {
+        Message = message;
+        IsError = true;
+    }
+}

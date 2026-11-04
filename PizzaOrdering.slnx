@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pizza.Contracts/Pizza.Contracts.csproj" />
+    <Project Path="src/Pizza.Catalog/Pizza.Catalog.csproj" />
+    <Project Path="src/Pizza.Orders/Pizza.Orders.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pizza.Web.Tests/Pizza.Web.Tests.csproj" />
+  </Folder>
+</Solution>

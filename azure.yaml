@@ -1,0 +1,147 @@
+name: pizza-ordering
+
+services:
+  pizza-web:
+    project: ./src/Pizza.Web
+    language: csharp
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+
+  pizza-ordering-agent:
+    project: .
+    host: azure.ai.agent
+    kind: prompt
+    name: pizza-ordering-agent
+    model: gpt-5-mini
+    instructions: |
+      You are the pizza ordering assistant. Help customers browse the live pizza
+      catalog, discuss food and wine pairings, and place delivery orders.
+
+      Always fetch the catalog before making recommendations or creating an
+      order. Only recommend items that are marked available. Use the exact
+      pizzaId and current catalog price when submitting an order; the backend
+      recalculates and snapshots the price. Collect the customer's name,
+      delivery address, pizza selection, and quantity, then summarize the
+      complete order and get the customer's explicit confirmation before
+      calling the order-creation operation. Never claim an order was placed
+      unless the API returns a successful response and order ID.
+
+      For wine-pairing questions, use the available web search capability and
+      explain that pairings are suggestions. Do not invent allergy or dietary
+      safety guarantees. The current web search is a temporary substitute for
+      the unspecified WebIQ API; do not claim to be connected to WebIQ.
+    harness:
+      type: microsoft_copilot_preview
+    tools:
+      - type: openapi
+        openapi:
+          name: pizza-ordering-api
+          description: Browse the pizza menu and submit a customer-confirmed order.
+          spec:
+            openapi: 3.0.3
+            info:
+              title: Pizza Ordering API
+              version: 1.0.0
+            servers:
+              - url: https://pizza-pizza-dev-1105-u73lzv5y.politecoast-c2201c00.swedencentral.azurecontainerapps.io
+                description: Deployed pizza web and ordering API.
+            paths:
+              /api/catalog/pizzas:
+                get:
+                  operationId: listPizzas
+                  summary: List the current pizza menu
+                  responses:
+                    "200":
+                      description: Current menu with prices and availability.
+                      content:
+                        application/json:
+                          schema:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, format: uuid }
+                                name: { type: string }
+                                description: { type: string }
+                                price: { type: number, format: double }
+                                imageUrl: { type: string }
+                                isAvailable: { type: boolean }
+                              required: [id, name, description, price, imageUrl, isAvailable]
+              /api/orders/:
+                post:
+                  operationId: createDeliveryOrder
+                  summary: Place an order after the customer confirms its details
+                  requestBody:
+                    required: true
+                    content:
+                      application/json:
+                        schema:
+                          type: object
+                          properties:
+                            customerName: { type: string, maxLength: 120 }
+                            customerAddress: { type: string, maxLength: 500 }
+                            items:
+                              type: array
+                              minItems: 1
+                              maxItems: 20
+                              items:
+                                type: object
+                                properties:
+                                  pizzaId: { type: string, format: uuid }
+                                  quantity: { type: integer, minimum: 1, maximum: 50 }
+                                required: [pizzaId, quantity]
+                          required: [customerName, customerAddress, items]
+                  responses:
+                    "201":
+                      description: Order created.
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+                            properties:
+                              id: { type: string, format: uuid }
+                              customer:
+                                type: object
+                                properties:
+                                  name: { type: string }
+                                  address: { type: string }
+                              items:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    pizzaId: { type: string, format: uuid }
+                                    pizzaName: { type: string }
+                                    unitPrice: { type: number, format: double }
+                                    quantity: { type: integer }
+                                    lineTotal: { type: number, format: double }
+                              status:
+                                type: string
+                                enum: [New, Preparing, OutForDelivery, Completed]
+                              createdAt: { type: string, format: date-time }
+                              total: { type: number, format: double }
+                    "400":
+                      description: Invalid customer, item, or quantity.
+          auth:
+            type: anonymous
+      - type: web_search
+    skills:
+      - name: pizza-ordering-guidance
+        version: "1"
+
+hooks:
+  prepackage:
+    windows:
+      shell: pwsh
+      run: dotnet publish .\src\Pizza.Web\Pizza.Web.csproj --configuration Release --output .\src\Pizza.Web\container-publish
+    posix:
+      shell: sh
+      run: dotnet publish ./src/Pizza.Web/Pizza.Web.csproj --configuration Release --output ./src/Pizza.Web/container-publish
+  postprovision:
+    windows:
+      shell: pwsh
+      run: ./scripts/provision-sql.ps1
+    posix:
+      shell: sh
+      run: ./scripts/provision-sql.sh

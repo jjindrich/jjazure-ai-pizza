@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title">
+  <title id="title">Illustration of a freshly baked pizza</title>
+  <rect width="640" height="400" rx="28" fill="#f3e7d2"/>
+  <circle cx="320" cy="205" r="152" fill="#bb7137"/>
+  <circle cx="320" cy="205" r="134" fill="#f2c65f"/>
+  <circle cx="320" cy="205" r="114" fill="#c94f35"/>
+  <path d="M225 120c44-32 113-37 160-9M214 265c57 39 150 35 204-9" fill="none" stroke="#fff1d2" stroke-width="16" stroke-linecap="round"/>
+  <g fill="#f4e3bf">
+    <circle cx="260" cy="163" r="20"/><circle cx="365" cy="145" r="20"/>
+    <circle cx="389" cy="226" r="20"/><circle cx="286" cy="250" r="20"/>
+  </g>
+  <g fill="#3c7b4e">
+    <path d="M308 157c-15-26 13-38 27-21 7 11 1 27-27 21z"/>
+    <path d="M236 213c-7-28 22-34 31-14 3 13-7 27-31 14z"/>
+    <path d="M342 275c-7-28 22-34 31-14 3 13-7 27-31 14z"/>
+  </g>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "accountName": { "value": "pizzaai6vlb6lob5qc3o" },
+    "projectName": { "value": "pizza-ordering-agent" },
+    "location": { "value": "swedencentral" },
+    "tags": {
+      "value": {
+        "application": "jjazure-ai-pizza",
+        "scope": "foundry"
+      }
+    }
+  }
+}
