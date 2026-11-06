@@ -1,0 +1,175 @@
+@page "/api-docs"
+@using Pizza.Contracts
+@inject PriceDisplay Prices
+
+<PageTitle>API documentation</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">DEVELOPER REFERENCE</p>
+        <h1>API documentation</h1>
+        <p class="text-secondary">Catalog and delivery APIs provided by Pizza Kitchen.</p>
+    </div>
+</section>
+
+<section class="management-panel">
+    <h2>Before you start</h2>
+    <p>Catalog and Orders are separate services. Send <code>/api/catalog/*</code> requests to the Catalog origin
+        and <code>/api/orders/*</code> requests to the Orders origin. This reference is available at
+        <code>/api-docs</code> on both services. JSON property names are camelCase; send
+        <code>Content-Type: application/json</code> for JSON request bodies. IDs are UUIDs.</p>
+    <p><strong>MVP only:</strong> these APIs have no authentication or authorization. Do not send real customer
+        data or expose them publicly without access controls. Each service permits 120 API requests per minute
+        per remote IP, with no queue; the current limiter returns HTTP 503 when exhausted.</p>
+    <p>Prices are decimal amounts, not minor units. No API payload carries a currency code and no conversion is
+        performed. Configure the same <code>Pizza:CurrencyCode</code> on both services.
+        This service currently displays: <strong>@(Prices.CurrencyCode ?? "currency not configured")</strong>.
+        Without configuration, the UI shows amounts without a currency symbol rather than guessing a currency.</p>
+</section>
+
+<section class="management-panel">
+    <h2>Catalog endpoints</h2>
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Method and route</th><th>Request</th><th>Success response</th><th>Errors</th></tr></thead>
+            <tbody>
+                <tr><td><code>GET /api/catalog/pizzas</code></td><td>None</td><td>200: PizzaItem[] (empty array when no pizzas)</td><td></td></tr>
+                <tr><td><code>GET /api/catalog/pizzas/{id}</code></td><td>UUID path parameter</td><td>200: PizzaItem</td><td>404: not found</td></tr>
+                <tr><td><code>POST /api/catalog/pizzas</code></td><td>PizzaUpsertRequest</td><td>201: PizzaItem; Location header points to the new pizza</td><td>400: validation problem</td></tr>
+                <tr><td><code>PUT /api/catalog/pizzas/{id}</code></td><td>PizzaUpsertRequest (full replacement of editable fields)</td><td>200: PizzaItem (image is preserved)</td><td>400: validation problem; 404: not found</td></tr>
+                <tr><td><code>DELETE /api/catalog/pizzas/{id}</code></td><td>None</td><td>204: no body</td><td>404: not found</td></tr>
+                <tr><td><code>POST /api/catalog/pizzas/{id}/image</code></td><td>multipart/form-data; file field named <code>file</code></td><td>200: updated PizzaItem</td><td>400: invalid image; 404: pizza not found; 413: request too large</td></tr>
+                <tr><td><code>GET /api/catalog/images/{key}</code></td><td>Image key from an uploaded imageUrl</td><td>200: binary image with its image Content-Type</td><td>400: invalid key; 404: not found</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <h3>Request and response shapes</h3>
+    <p><code>PizzaUpsertRequest</code>: name (required, nonblank, trimmed length 1-100), description
+        (required, nonblank, trimmed length 1-500), price (number, greater than 0 and at most 10000),
+        isAvailable (boolean, optional, defaults to true). The server trims name and description.</p>
+    <pre><code>@("""
+        {
+          "name": "Margherita",
+          "description": "Tomato sauce, mozzarella, fresh basil",
+          "price": 10.50,
+          "isAvailable": true
+        }
+        """)</code></pre>
+    <p><code>PizzaItem</code> response example (IDs are illustrative; use the ID returned by your request):</p>
+    <pre><code>@("""
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "name": "Margherita",
+          "description": "Tomato sauce, mozzarella, fresh basil",
+          "price": 10.50,
+          "imageUrl": "/images/pizza.svg",
+          "isAvailable": true
+        }
+        """)</code></pre>
+    <p>New pizzas use the default image. Upload photos after creation: JPEG, PNG or WebP only, from 1 byte
+        through 5 MiB (5,242,880 bytes), with a matching file signature and MIME type. Total multipart
+        request limit is 5 MiB + 64 KiB. Uploaded imageUrl values are relative to the Catalog origin;
+        seeded/default images are served as static assets under <code>/images/</code>.</p>
+    <h3>Catalog examples (curl)</h3>
+    <p>Replace <code>CATALOG_ORIGIN</code>, <code>PIZZA_ID</code> and <code>IMAGE_KEY</code>. Save the
+        request above as <code>pizza.json</code>. On Windows, use <code>curl.exe</code>.</p>
+    <pre><code>@("""
+        curl CATALOG_ORIGIN/api/catalog/pizzas
+        curl CATALOG_ORIGIN/api/catalog/pizzas/PIZZA_ID
+        curl -i -X POST CATALOG_ORIGIN/api/catalog/pizzas -H "Content-Type: application/json" --data-binary "@pizza.json"
+        curl -X PUT CATALOG_ORIGIN/api/catalog/pizzas/PIZZA_ID -H "Content-Type: application/json" --data-binary "@pizza.json"
+        curl -X POST CATALOG_ORIGIN/api/catalog/pizzas/PIZZA_ID/image -F "file=@pizza.png;type=image/png"
+        curl CATALOG_ORIGIN/api/catalog/images/IMAGE_KEY --output photo.png
+        curl -i -X DELETE CATALOG_ORIGIN/api/catalog/pizzas/PIZZA_ID
+        """)</code></pre>
+</section>
+
+<section class="management-panel">
+    <h2>Orders endpoints</h2>
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Method and route</th><th>Request</th><th>Success response</th><th>Errors</th></tr></thead>
+            <tbody>
+                <tr><td><code>GET /api/orders/</code></td><td>None</td><td>200: PizzaOrder[] (empty array when no orders)</td><td></td></tr>
+                <tr><td><code>GET /api/orders/{id}</code></td><td>UUID path parameter</td><td>200: PizzaOrder</td><td>404: not found</td></tr>
+                <tr><td><code>POST /api/orders/</code></td><td>CreateOrderRequest</td><td>201: PizzaOrder; Location header points to the new order</td><td>400: validation problem; 503: catalog unavailable</td></tr>
+                <tr><td><code>PUT /api/orders/{id}/status</code></td><td>UpdateOrderStatusRequest</td><td>200: updated PizzaOrder</td><td>400: validation problem; 404: not found</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <h3>Request and response shapes</h3>
+    <p><code>CreateOrderRequest</code>: customerName (required, nonblank, trimmed length 1-120),
+        customerAddress (required, nonblank, trimmed length 1-500), items (1-20 entries).
+        Each entry has pizzaId (UUID of an available catalog pizza) and quantity (integer, 1-50).
+        The server reads prices and names from the Catalog and saves an order-time snapshot;
+        clients cannot set prices, totals, IDs, creation time or initial status.</p>
+    <pre><code>@("""
+        {
+          "customerName": "Example Customer",
+          "customerAddress": "1 Example Street",
+          "items": [
+            { "pizzaId": "00000000-0000-0000-0000-000000000001", "quantity": 2 }
+          ]
+        }
+        """)</code></pre>
+    <p><code>PizzaOrder</code> response example:</p>
+    <pre><code>@("""
+        {
+          "id": "10000000-0000-0000-0000-000000000001",
+          "customer": { "name": "Example Customer", "address": "1 Example Street" },
+          "items": [
+            {
+              "pizzaId": "00000000-0000-0000-0000-000000000001",
+              "pizzaName": "Margherita",
+              "unitPrice": 10.50,
+              "quantity": 2,
+              "lineTotal": 21.00
+            }
+          ],
+          "status": "New",
+          "createdAt": "2026-11-06T12:00:00+00:00",
+          "total": 21.00
+        }
+        """)</code></pre>
+    <p><code>UpdateOrderStatusRequest</code>: <code>{"status":"Preparing"}</code>.
+        Status values in responses are strings. Orders start at <code>New</code> and can only advance
+        one step: <code>New → Preparing → OutForDelivery → Completed</code>. Skipping, repeating
+        or reversing stages is rejected. Completed orders cannot advance.</p>
+    <h3>Orders examples (curl)</h3>
+    <p>Replace <code>ORDERS_ORIGIN</code> and <code>ORDER_ID</code>. Save the create request as
+        <code>order.json</code> and the status request as <code>status.json</code>.
+        Use a real available pizza ID from the Catalog rather than assuming seeded IDs exist.</p>
+    <pre><code>@("""
+        curl ORDERS_ORIGIN/api/orders/
+        curl ORDERS_ORIGIN/api/orders/ORDER_ID
+        curl -i -X POST ORDERS_ORIGIN/api/orders/ -H "Content-Type: application/json" --data-binary "@order.json"
+        curl -X PUT ORDERS_ORIGIN/api/orders/ORDER_ID/status -H "Content-Type: application/json" --data-binary "@status.json"
+        """)</code></pre>
+</section>
+
+<section class="management-panel">
+    <h2>Errors and health</h2>
+    <p>Service validation failures use HTTP 400 and a JSON validation problem. Catalog and order creation
+        errors use <code>errors.request</code>; order status errors use <code>errors.status</code>.
+        Malformed JSON or parameter binding can also return 400. Upload validation returns a JSON
+        object with an <code>error</code> string. Missing resources or invalid routes return 404;
+        status-code pages may return HTML rather than JSON, so check the response Content-Type.</p>
+    <pre><code>@("""
+        {
+          "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+          "title": "One or more validation errors occurred.",
+          "status": 400,
+          "errors": {
+            "request": ["Price must be greater than 0 and no more than 10,000."]
+          }
+        }
+        """)</code></pre>
+    <p>If Orders cannot reach the Catalog during creation, HTTP 503 returns a problem with
+        title <code>Catalog unavailable</code> and detail
+        <code>The order was not created. Please retry when the catalog is available.</code></p>
+    <p>Both services provide <code>GET /health/ready</code>: HTTP 200, text <code>Healthy</code>
+        when healthy (503 when unhealthy). No external dependency probes are registered, so this
+        checks the process, not Cosmos DB, Storage, SQL or Catalog connectivity.</p>
+    <pre><code>curl CATALOG_ORIGIN/health/ready
+curl ORDERS_ORIGIN/health/ready</code></pre>
+</section>

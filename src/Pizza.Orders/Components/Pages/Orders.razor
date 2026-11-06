@@ -1,0 +1,192 @@
+@page "/orders"
+@page "/"
+@inject IPizzaCatalogReader Catalog
+@inject OrderService OrderManager
+@inject PriceDisplay Prices
+
+<PageTitle>Orders</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">ORDER DESK</p>
+        <h1>Pizza orders</h1>
+        <p class="text-secondary">Create a delivery order and move it through the kitchen workflow.</p>
+    </div>
+    <span class="menu-count">@OrderList.Count orders</span>
+</section>
+
+@if (Prices.CurrencyCode is null)
+{
+    <p class="text-secondary">Currency is not configured. Amounts are shown without a currency symbol.</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert @(IsError ? "alert-danger" : "alert-success")" role="status">@Message</div>
+}
+
+<section class="management-panel">
+    <h2>New delivery</h2>
+    @if (AvailablePizzas.Count == 0)
+    {
+        <p>No pizzas are currently available to order.</p>
+    }
+    else
+    {
+        <EditForm Model="this" OnValidSubmit="CreateAsync">
+            <div class="form-grid">
+                <label>
+                    Pizza
+                    <InputSelect @bind-Value="SelectedPizzaId" class="form-select">
+                        @foreach (var pizza in AvailablePizzas)
+                        {
+                            <option value="@pizza.Id">@pizza.Name — @Prices.Format(pizza.Price)</option>
+                        }
+                    </InputSelect>
+                </label>
+                <label>
+                    Quantity
+                    <InputNumber @bind-Value="Quantity" class="form-control" min="1" max="50" />
+                </label>
+                <label>
+                    Customer name
+                    <InputText @bind-Value="CustomerName" class="form-control" maxlength="120" />
+                </label>
+                <label class="wide-field">
+                    Delivery address
+                    <InputText @bind-Value="CustomerAddress" class="form-control" maxlength="500" />
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Place order</button>
+            </div>
+        </EditForm>
+    }
+</section>
+
+<section class="management-panel">
+    <h2>All orders</h2>
+    @if (OrderList.Count == 0)
+    {
+        <p>No orders yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in OrderList)
+                    {
+                        <tr>
+                            <td><code>@order.Id.ToString("N")[..8]</code><br /><small>@order.CreatedAt.ToLocalTime().ToString("g")</small></td>
+                            <td>@order.Customer.Name<br /><small>@order.Customer.Address</small></td>
+                            <td>@string.Join(", ", order.Items.Select(item => $"{item.Quantity} × {item.PizzaName}"))</td>
+                            <td>@Prices.Format(order.Total)</td>
+                            <td><span class="status-badge">@StatusLabel(order.Status)</span></td>
+                            <td>
+                                @if (order.Status != OrderStatus.Completed)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => AdvanceAsync(order)">
+                                        Next: @StatusLabel((OrderStatus)((int)order.Status + 1))
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<PizzaItem> AvailablePizzas = [];
+    private IReadOnlyList<PizzaOrder> OrderList = [];
+    private string SelectedPizzaId = "";
+    private int Quantity = 1;
+    private string CustomerName = "";
+    private string CustomerAddress = "";
+    private string? Message;
+    private bool IsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            AvailablePizzas = (await Catalog.GetAllAsync(CancellationToken.None))
+                .Where(pizza => pizza.IsAvailable).ToArray();
+        }
+        catch (CatalogUnavailableException)
+        {
+            ShowError("The catalog is temporarily unavailable. Existing orders can still be viewed.");
+        }
+        SelectedPizzaId = AvailablePizzas.FirstOrDefault()?.Id.ToString() ?? "";
+        await ReloadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        if (!Guid.TryParse(SelectedPizzaId, out var pizzaId))
+        {
+            ShowError("Choose a pizza from the catalog.");
+            return;
+        }
+
+        try
+        {
+            await OrderManager.CreateAsync(
+                new CreateOrderRequest(CustomerName, CustomerAddress, [new OrderItemRequest(pizzaId, Quantity)]),
+                CancellationToken.None);
+            CustomerName = "";
+            CustomerAddress = "";
+            Quantity = 1;
+            Message = "Order created.";
+            IsError = false;
+            await ReloadAsync();
+        }
+        catch (OrderValidationException exception)
+        {
+            ShowError(exception.Message);
+        }
+        catch (CatalogUnavailableException)
+        {
+            ShowError("The catalog is temporarily unavailable. The order was not created; please retry later.");
+        }
+    }
+
+    private async Task AdvanceAsync(PizzaOrder order)
+    {
+        try
+        {
+            await OrderManager.UpdateStatusAsync(order.Id, (OrderStatus)((int)order.Status + 1), CancellationToken.None);
+            Message = $"Order {order.Id.ToString("N")[..8]} updated.";
+            IsError = false;
+            await ReloadAsync();
+        }
+        catch (OrderValidationException exception)
+        {
+            ShowError(exception.Message);
+        }
+    }
+
+    private async Task ReloadAsync() =>
+        OrderList = await OrderManager.GetAllAsync(CancellationToken.None);
+
+    private static string StatusLabel(OrderStatus status) => status switch
+    {
+        OrderStatus.New => "New",
+        OrderStatus.Preparing => "Preparing",
+        OrderStatus.OutForDelivery => "Out for delivery",
+        OrderStatus.Completed => "Completed",
+        _ => status.ToString()
+    };
+
+    private void ShowError(string message)
+    {
+        Message = message;
+        IsError = true;
+    }
+}
