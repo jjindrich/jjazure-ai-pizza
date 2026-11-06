@@ -2,6 +2,7 @@
 @page "/"
 @inject IPizzaCatalogReader Catalog
 @inject OrderService OrderManager
+@inject PriceDisplay Prices
 
 <PageTitle>Orders</PageTitle>
 
@@ -13,6 +14,11 @@
     </div>
     <span class="menu-count">@OrderList.Count orders</span>
 </section>
+
+@if (Prices.CurrencyCode is null)
+{
+    <p class="text-secondary">Currency is not configured. Amounts are shown without a currency symbol.</p>
+}
 
 @if (!string.IsNullOrWhiteSpace(Message))
 {
@@ -34,7 +40,7 @@
                     <InputSelect @bind-Value="SelectedPizzaId" class="form-select">
                         @foreach (var pizza in AvailablePizzas)
                         {
-                            <option value="@pizza.Id">@pizza.Name — @pizza.Price.ToString("C")</option>
+                            <option value="@pizza.Id">@pizza.Name — @Prices.Format(pizza.Price)</option>
                         }
                     </InputSelect>
                 </label>
@@ -78,7 +84,7 @@
                             <td><code>@order.Id.ToString("N")[..8]</code><br /><small>@order.CreatedAt.ToLocalTime().ToString("g")</small></td>
                             <td>@order.Customer.Name<br /><small>@order.Customer.Address</small></td>
                             <td>@string.Join(", ", order.Items.Select(item => $"{item.Quantity} × {item.PizzaName}"))</td>
-                            <td>@order.Total.ToString("C")</td>
+                            <td>@Prices.Format(order.Total)</td>
                             <td><span class="status-badge">@StatusLabel(order.Status)</span></td>
                             <td>
                                 @if (order.Status != OrderStatus.Completed)

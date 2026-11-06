@@ -10,9 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="..\Shared\ApiDocumentation.razor" Link="Components\Pages\ApiDocumentation.razor" />
     <ProjectReference Include="..\Pizza.Contracts\Pizza.Contracts.csproj" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
 </Project>

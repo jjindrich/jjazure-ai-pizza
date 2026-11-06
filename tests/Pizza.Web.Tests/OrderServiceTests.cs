@@ -1,4 +1,5 @@
 using Pizza.Orders.Data;
+using Pizza.Catalog.Data;
 using Pizza.Contracts;
 using Pizza.Orders.Services;
 

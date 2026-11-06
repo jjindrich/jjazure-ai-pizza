@@ -10,6 +10,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(new PriceDisplay(builder.Configuration["Pizza:CurrencyCode"]));
+builder.Services.AddSingleton(new ServiceLinks(builder.Configuration["Pizza:CatalogUrl"], builder.Environment.IsDevelopment()));
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddRateLimiter(options =>

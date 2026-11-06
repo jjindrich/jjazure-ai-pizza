@@ -1,4 +1,4 @@
-using Pizza.Orders.Data;
+using Pizza.Catalog.Data;
 
 namespace Pizza.Orders.Tests;
 

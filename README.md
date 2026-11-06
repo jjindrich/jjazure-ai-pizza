@@ -7,11 +7,22 @@ Blazor Web App and JSON API for a pizza catalog and delivery orders, plus a Micr
 Requires the .NET 10 SDK.
 
 ```powershell
-dotnet run --project src\Pizza.Web
+# Terminal 1: Catalog
+$env:Pizza__StorageMode = 'memory'
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+dotnet run --project src\Pizza.Catalog --no-launch-profile --urls http://localhost:5080
+# Terminal 2: Orders
+$env:Pizza__StorageMode = 'memory'
+$env:Pizza__CatalogUrl = 'http://localhost:5080'
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+dotnet run --project src\Pizza.Orders --no-launch-profile --urls http://localhost:5081
 dotnet test PizzaOrdering.slnx
 ```
 
-The local app serves the menu at `/`, order management at `/orders`, and these APIs:
+Catalog serves the menu at `/` on port 5080. Orders serves order management at `/orders` (also `/`)
+on port 5081. Both applications include **API documentation** in navigation at `/api-docs`, with
+request/response schemas, validation limits, status codes, image uploads and curl examples.
+Catalog and Orders APIs must be called on their respective service origins:
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -21,12 +32,139 @@ The local app serves the menu at `/`, order management at `/orders`, and these A
 | `PUT` | `/api/catalog/pizzas/{id}` | Edit a pizza |
 | `DELETE` | `/api/catalog/pizzas/{id}` | Delete a pizza |
 | `POST` | `/api/catalog/pizzas/{id}/image` | Upload a JPEG, PNG, or WebP image (max 5 MB) |
+| `GET` | `/api/catalog/images/{key}` | Read an uploaded image |
 | `POST` | `/api/orders/` | Place an order with one or more catalog IDs and quantities |
 | `GET` | `/api/orders/` | List orders |
 | `GET` | `/api/orders/{id}` | Read one order |
 | `PUT` | `/api/orders/{id}/status` | Advance one step: New → Preparing → Out for delivery → Completed |
 
 Order prices are read from the live catalog and saved as a snapshot; clients cannot choose a price. The order API rejects unavailable pizzas and quantities outside 1–50. The menu's sample images are illustrative; uploaded photos are stored in Blob Storage and served through the app so the container can remain private.
+
+### Managing pizzas and currency
+
+Use **Add pizza** above the menu to open and focus the management form. Enter a name, description,
+price and availability, then submit. **Edit** opens the same form with the selected pizza's values
+and scrolls it into view on desktop and mobile. **Cancel** clears the draft; adding or cancelling
+never changes an existing pizza. After creation, use **Change photo** on its card to upload an image.
+The form uses the same validation rules as the Catalog service and API.
+
+The original source defines no business currency. Both UIs now format decimal amounts consistently,
+independently of the host OS culture, without the invariant-culture `¤` symbol or an inferred local
+currency. Until the business currency is confirmed, amounts have two decimal places and no currency
+symbol, with an explicit unconfigured notice. Set `Pizza:CurrencyCode` (environment variable
+`Pizza__CurrencyCode`) to the confirmed three-letter uppercase ISO currency code **on both services**
+to display that code next to prices and totals. No currency is selected by default, stored prices
+are not converted, and JSON API contracts are unchanged.
+
+Cross-service navigation uses `Pizza:OrdersUrl` on Catalog and the existing `Pizza:CatalogUrl` on
+Orders. Values must be HTTPS origins (loopback HTTP is allowed in Development). Without an Orders
+origin, Catalog retains its previous relative link. Configure the real verified endpoint only after
+the replacement is healthy; no source code embeds the future Orders hostname.
+
+### Fresh private Azure stack
+
+The current approved design is `.azure/infrastructure-plan.json`. `infra/main.bicep` is
+subscription-scoped and creates `rg-jjazure-ai-pizza-apps` in Sweden Central, plus the explicitly
+named Container Apps managed networking group `rg-jjazure-ai-pizza-apps-managed`.
+The stopped additive migration in `.azure/deployment-plan.md`, `infra.bak/`, and `azure.yaml`
+is historical, not the current deployment entry point. Do not run its old hooks or reuse its URLs.
+The new SQL database starts empty; the Catalog seeds its sample menu. No old backup is assumed.
+
+The foundation module creates a VNet-integrated Consumption Container Apps environment, private
+SQL endpoint/DNS with public SQL access disabled and Entra-only authentication, serverless Cosmos DB,
+private Blob container, ACR Basic and managed identities. Catalog/Orders HTTPS web APIs are public,
+unauthenticated demo endpoints: use synthetic data only. This is not a production security boundary.
+Cosmos and Blob also use private endpoints and private DNS in the existing endpoint subnet. This
+approved extension accommodates organization policies that enforce disabled public data access.
+Registry and Foundry endpoints remain authenticated public endpoints.
+Storage/registry/Cosmos endpoints require identity authentication; Blob anonymous access and account
+keys, Cosmos local authentication and the ACR admin account are disabled.
+
+Set `PIZZA_SQL_ADMIN_OBJECT_ID` and `PIZZA_SQL_ADMIN_DISPLAY_NAME` to the verified final Entra user,
+then run read-only preflight from the repository root:
+
+```powershell
+az bicep build --file infra\main.bicep --stdout > $null
+az deployment sub validate --location swedencentral --template-file infra\main.bicep --parameters infra\main.bicepparam
+az deployment sub what-if --location swedencentral --template-file infra\main.bicep --parameters infra\main.bicepparam
+```
+
+Provisioning and remote image builds require the separate validated-plan deployment approval.
+After that approval, execute the subscription deployment with the same template/parameters.
+Foundation and Foundry are independent deployment branches. Build Catalog, Orders and SQL
+initializer images from current source in parallel through the new ACR (or an available Linux
+Docker engine), using their respective Dockerfiles. The root `.dockerignore` allowlists source
+and excludes credentials, local data, stale publish output, infrastructure and binaries.
+All runtime images must be supplied as actual immutable registry digests; never deploy validation
+placeholder images. Empty image parameters intentionally omit the associated app/job.
+
+Bootstrap and verify SQL before enabling Orders:
+
+1. For a new empty deployment, explicitly set `bootstrapEnabled=true`; supply the initializer image
+   and start the no-ingress job. Defaults are false to prevent recreating a cleaned-up administrator.
+2. Require job success and logs proving private DNS/TCP, schema, correct Orders application SID,
+   no database roles and exactly CONNECT plus SELECT/INSERT/UPDATE on `dbo.PizzaOrders`.
+3. Set `bootstrapEnabled=false` to hand the SQL administrator child resource to the approved final
+   Entra user. Keep app images empty until schema/grants are verified.
+4. Run the existing job once with command `dotnet Pizza.SqlInitializer.dll --verify-revoked`
+   and require the specific SQL login-denied result, not a DNS/network error or generic failure.
+5. Explicitly delete the exact temporary job, its AcrPull role assignment and initializer identity
+   using the deployment output IDs, and verify all three are absent. Incremental omission does
+   **not** delete resources. Subsequent deployments must keep `bootstrapEnabled=false`.
+6. Deploy Catalog and Orders with immutable images and verified cross-service HTTPS origins.
+   Verify real APIs, an order in SQL, the Orders website and persistence across a revision restart.
+   Health endpoints alone are insufficient.
+
+Do not open SQL to public/Azure-services traffic, grant broad database roles, create a public
+bootstrap app or reuse identities outside the new group to work around an initialization failure.
+The revised conservative estimate is approximately USD 175/month, including the additional
+Cosmos/Blob private endpoints, private DNS and uncertain platform
+networking allowances, not a hard billing cap. The USD 500 authorization is not an indefinite
+spending guarantee; track actual usage, model tokens and resource lifetime.
+
+### Foundry agent configuration
+
+The new Foundry account/project/model are declared in `infra/modules/foundry.bicep`.
+After both live app origins are verified, deploy `infra/agent-connections.bicep` to the new group
+with that account/project and those origins. Even anonymous OpenAPI tools use explicit project
+connections (`authType=None`), one for Catalog and one for Orders.
+
+Render `agent/pizza-agent.template.json` by replacing `__CATALOG_URL__`, `__ORDERS_URL__` with the
+verified HTTPS origins (no trailing slash), and `__PROJECT_ID__` with the full new project's ARM ID.
+`tools/Configure-PizzaAgent.ps1` validates the approved project scope and renders/submits this template.
+Submit the rendered JSON to `POST {projectEndpoint}/agents?api-version=v1`, authenticating through
+the current Azure identity for `https://ai.azure.com`. Do not place access tokens in files/source.
+The prompt agent uses the new `gpt-5-mini` deployment and exposes only catalog reads and order
+creation, not catalog administration. It requires live IDs and explicit order confirmation.
+
+Invoke through the agent's OpenAI responses endpoint
+`{projectEndpoint}/agents/pizza-ordering-agent/endpoint/protocols/openai/responses?api-version=v1`.
+Prove a real catalog tool call and confirmed synthetic order tool call; compare the returned order
+ID with `/api/orders/{id}` and the Orders website. A plausible assistant message is not proof.
+The source API reference remains available on each app at `/api-docs`.
+
+### Browser and API regression checks
+
+With local in-memory Catalog and Orders running on ports 5188 and 5189 respectively, run:
+
+```powershell
+python -m pip install playwright
+python -m playwright install chromium
+python tests\ui\catalog_smoke.py
+# Or use installed Microsoft Edge without downloading Chromium:
+python tests\ui\catalog_smoke.py --channel msedge
+```
+
+When both loopback services have cross-service origins configured, add
+`--check-service-links` to check Catalog -> Orders -> Catalog navigation on desktop and mobile.
+
+The script checks desktop and mobile create/edit/cancel/delete/photo flows, validation, actual
+scroll position and keyboard focus (including reduced motion), API documentation on both services,
+all documented API routes and the complete order status lifecycle. It creates synthetic data and
+must run only against disposable local in-memory services, never Azure or real customer data.
+Use `--catalog` and `--orders` to change loopback URLs.
+For explicitly configured services, also pass `--currency-code` with the expected code to verify
+matching currency displays in catalog cards, order selection and order totals.
 
 ## Azure and Foundry setup
 

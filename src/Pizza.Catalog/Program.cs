@@ -8,6 +8,8 @@ using System.Threading.RateLimiting;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddHealthChecks();
+builder.Services.AddSingleton(new PriceDisplay(builder.Configuration["Pizza:CurrencyCode"]));
+builder.Services.AddSingleton(new ServiceLinks(builder.Configuration["Pizza:OrdersUrl"], builder.Environment.IsDevelopment()));
 builder.Services.AddRateLimiter(options =>
     options.AddPolicy("pizza-api", context =>
         RateLimitPartition.GetFixedWindowLimiter(

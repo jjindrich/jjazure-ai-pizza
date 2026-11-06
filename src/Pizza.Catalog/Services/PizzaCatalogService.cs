@@ -76,7 +76,7 @@ public sealed class PizzaCatalogService(IPizzaCatalogStore store)
         return true;
     }
 
-    private static void Validate(PizzaUpsertRequest request)
+    public static void Validate(PizzaUpsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
         {

@@ -7,6 +7,7 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);container-publish/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="..\Shared\ApiDocumentation.razor" Link="Components\Pages\ApiDocumentation.razor" />
     <ProjectReference Include="..\Pizza.Contracts\Pizza.Contracts.csproj" />
     <PackageReference Include="Azure.Identity" Version="1.17.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />

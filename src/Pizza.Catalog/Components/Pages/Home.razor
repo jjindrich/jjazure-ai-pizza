@@ -1,6 +1,8 @@
 @page "/"
 @inject PizzaCatalogService Catalog
 @inject IPizzaImageStore Images
+@inject PriceDisplay Prices
+@inject IJSRuntime JS
 
 <PageTitle>Pizza menu</PageTitle>
 
@@ -10,8 +12,16 @@
         <h1>Pizza menu</h1>
         <p class="text-secondary">Browse the menu or manage the pizzas available to customers.</p>
     </div>
-    <span class="menu-count">@Pizzas.Count pizzas</span>
+    <div class="form-actions">
+        <span class="menu-count">@Pizzas.Count pizzas</span>
+        <button type="button" class="btn btn-primary" @onclick="AddPizza" disabled="@Saving">Add pizza</button>
+    </div>
 </section>
+
+@if (Prices.CurrencyCode is null)
+{
+    <p class="text-secondary">Currency is not configured. Amounts are shown without a currency symbol.</p>
+}
 
 @if (!string.IsNullOrWhiteSpace(Message))
 {
@@ -21,20 +31,20 @@
 <section class="pizza-grid">
     @foreach (var pizza in Pizzas)
     {
-        <article class="pizza-card">
+        <article class="pizza-card" @key="pizza.Id">
             <img src="@pizza.ImageUrl" alt="@pizza.Name" class="pizza-image" />
             <div class="pizza-card-content">
                 <div class="pizza-card-title">
                     <h2>@pizza.Name</h2>
-                    <span class="price">@pizza.Price.ToString("C")</span>
+                    <span class="price">@Prices.Format(pizza.Price)</span>
                 </div>
                 <p>@pizza.Description</p>
                 <div class="card-actions">
                     <span class="availability @(pizza.IsAvailable ? "available" : "unavailable")">
                         @(pizza.IsAvailable ? "Available" : "Not available")
                     </span>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Edit(pizza)">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(pizza.Id)">Delete</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Edit(pizza)" disabled="@Saving">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(pizza.Id)" disabled="@Saving">Delete</button>
                 </div>
                 <label class="image-upload">
                     <span>Change photo</span>
@@ -45,48 +55,58 @@
     }
 </section>
 
-<section class="management-panel">
-    <h2>@(EditingId is null ? "Add a pizza" : "Edit pizza")</h2>
-    <EditForm Model="this" OnValidSubmit="SaveAsync">
+<section class="management-panel" id="pizza-form" aria-labelledby="pizza-form-heading" @ref="FormPanel">
+    <h2 id="pizza-form-heading">@(EditingId is null ? "Add a pizza" : "Edit pizza")</h2>
+    <EditForm Model="Form" OnValidSubmit="SaveAsync" @key="Form">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@Saving">
         <div class="form-grid">
             <label>
                 Name
-                <InputText @bind-Value="Name" class="form-control" maxlength="100" />
+                <InputText id="pizza-name" @bind-Value="Form.Name" class="form-control" maxlength="100" />
             </label>
             <label>
-                Price
-                <InputNumber @bind-Value="Price" class="form-control" min="0.01" step="0.01" />
+                @Prices.Label
+                <InputNumber @bind-Value="Form.Price" class="form-control" min="0" max="10000" step="any" />
             </label>
             <label class="wide-field">
                 Ingredients and description
-                <InputTextArea @bind-Value="Description" class="form-control" maxlength="500" rows="2" />
+                <InputTextArea @bind-Value="Form.Description" class="form-control" maxlength="500" rows="2" />
             </label>
             <label class="checkbox-field">
-                <InputCheckbox @bind-Value="IsAvailable" />
+                <InputCheckbox @bind-Value="Form.IsAvailable" />
                 Available to order
             </label>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">@(EditingId is null ? "Add pizza" : "Save changes")</button>
-            @if (EditingId is not null)
-            {
-                <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">Cancel</button>
-            }
+            <button type="submit" class="btn btn-primary">@(Saving ? "Saving..." : EditingId is null ? "Add pizza" : "Save changes")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ResetForm">Cancel</button>
         </div>
+        </fieldset>
     </EditForm>
 </section>
 
 @code {
     private IReadOnlyList<PizzaItem> Pizzas = [];
     private Guid? EditingId;
-    private string Name = "";
-    private string Description = "";
-    private decimal Price = 10;
-    private bool IsAvailable = true;
+    private PizzaFormModel Form = new();
+    private ElementReference FormPanel;
+    private bool RevealForm;
+    private bool Saving;
     private string? Message;
     private bool IsError;
 
     protected override Task OnInitializedAsync() => ReloadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (RevealForm)
+        {
+            RevealForm = false;
+            await JS.InvokeVoidAsync("pizzaCatalog.revealForm", FormPanel);
+        }
+    }
 
     private async Task ReloadAsync() =>
         Pizzas = await Catalog.GetAllAsync(CancellationToken.None);
@@ -94,21 +114,42 @@
     private void Edit(PizzaItem pizza)
     {
         EditingId = pizza.Id;
-        Name = pizza.Name;
-        Description = pizza.Description;
-        Price = pizza.Price;
-        IsAvailable = pizza.IsAvailable;
+        Form = new PizzaFormModel
+        {
+            Name = pizza.Name,
+            Description = pizza.Description,
+            Price = pizza.Price,
+            IsAvailable = pizza.IsAvailable
+        };
+        RevealForm = true;
+        Message = null;
+    }
+
+    private void AddPizza()
+    {
+        ResetForm();
+        RevealForm = true;
         Message = null;
     }
 
     private async Task SaveAsync()
     {
+        if (Saving)
+        {
+            return;
+        }
+
+        Saving = true;
         try
         {
-            var request = new PizzaUpsertRequest(Name, Description, Price, IsAvailable);
+            var request = Form.ToRequest();
             if (EditingId is Guid id)
             {
-                await Catalog.UpdateAsync(id, request, CancellationToken.None);
+                if (await Catalog.UpdateAsync(id, request, CancellationToken.None) is null)
+                {
+                    ShowError("This pizza no longer exists. Cancel to add a new pizza.");
+                    return;
+                }
                 Message = "Pizza updated.";
             }
             else
@@ -125,11 +166,19 @@
         {
             ShowError(exception.Message);
         }
+        finally
+        {
+            Saving = false;
+        }
     }
 
     private async Task DeleteAsync(Guid id)
     {
         await Catalog.DeleteAsync(id, CancellationToken.None);
+        if (EditingId == id)
+        {
+            ResetForm();
+        }
         Message = "Pizza deleted.";
         IsError = false;
         await ReloadAsync();
@@ -158,10 +207,7 @@
     private void ResetForm()
     {
         EditingId = null;
-        Name = "";
-        Description = "";
-        Price = 10;
-        IsAvailable = true;
+        Form = new PizzaFormModel();
     }
 
     private void ShowError(string message)
