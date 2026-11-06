@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory)][string]$ProjectEndpoint,
     [Parameter(Mandatory)][string]$ProjectResourceId,
     [Parameter(Mandatory)][string]$CatalogOrigin,
-    [Parameter(Mandatory)][string]$OrdersOrigin
+    [Parameter(Mandatory)][string]$OrdersOrigin,
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9-]{0,62}$')]
+    [string]$AgentName = 'pizza-ordering-agent-copilot'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,17 +25,28 @@ if ($ProjectEndpoint.TrimEnd('/') -ne $expectedEndpoint) {
 }
 $root = Split-Path $PSScriptRoot -Parent
 $json = Get-Content (Join-Path $root 'agent\pizza-agent.template.json') -Raw
-$json = $json.Replace('__CATALOG_URL__', $CatalogOrigin.TrimEnd('/')).
+$json = $json.Replace('__AGENT_NAME__', $AgentName).
+    Replace('__CATALOG_URL__', $CatalogOrigin.TrimEnd('/')).
     Replace('__ORDERS_URL__', $OrdersOrigin.TrimEnd('/')).
     Replace('__PROJECT_ID__', $ProjectResourceId)
 $definition = $json | ConvertFrom-Json
-if ($definition.definition.tools.Count -ne 2 -or $json -match '__[A-Z_]+__') {
+if ($definition.definition.kind -ne 'prompt' -or
+    $definition.definition.harness.type -ne 'microsoft_copilot_preview' -or
+    $definition.definition.tools.Count -ne 3 -or
+    $definition.definition.tools[0].type -ne 'microsoft_copilot_toolset_preview' -or
+    $definition.definition.tools[0].default_config.enabled -ne $false -or
+    $definition.definition.skills.Count -ne 1 -or
+    $definition.definition.skills[0].name -ne 'pizza-ordering-guidance' -or
+    $definition.definition.skills[0].version -ne '1' -or
+    $json -match '__[A-Z_]+__') {
     throw 'Agent rendering failed or left unresolved template tokens.'
 }
 $output = Join-Path $root '.azure\rendered-agent.json'
+New-Item -ItemType Directory -Path (Split-Path $output -Parent) -Force | Out-Null
 [System.IO.File]::WriteAllText($output, $json)
 az rest --method post --url "$expectedEndpoint/agents?api-version=v1" `
     --resource https://ai.azure.com --body "@$output" `
+    --headers 'Foundry-Features=MicrosoftCopilot=V1Preview' `
     --query '{id:id,name:name,version:version,versions:versions}' -o json
 if ($LASTEXITCODE -ne 0) {
     throw 'Foundry did not confirm agent creation; do not assume the agent is ready.'
