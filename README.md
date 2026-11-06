@@ -129,16 +129,21 @@ After both live app origins are verified, deploy `infra/agent-connections.bicep`
 with that account/project and those origins. Even anonymous OpenAPI tools use explicit project
 connections (`authType=None`), one for Catalog and one for Orders.
 
-Render `agent/pizza-agent.template.json` by replacing `__CATALOG_URL__`, `__ORDERS_URL__` with the
-verified HTTPS origins (no trailing slash), and `__PROJECT_ID__` with the full new project's ARM ID.
-`tools/Configure-PizzaAgent.ps1` validates the approved project scope and renders/submits this template.
-Submit the rendered JSON to `POST {projectEndpoint}/agents?api-version=v1`, authenticating through
-the current Azure identity for `https://ai.azure.com`. Do not place access tokens in files/source.
-The prompt agent uses the new `gpt-5-mini` deployment and exposes only catalog reads and order
-creation, not catalog administration. It requires live IDs and explicit order confirmation.
+`agent/pizza-agent.template.json` declares the `microsoft_copilot_preview` harness, pins the
+`pizza-ordering-guidance` skill at version 1, and disables unused built-in harness tools. The same
+settings are present in `azure.yaml`, with separate Catalog and Orders OpenAPI tools bound to their
+project connections. The Copilot harness is fixed when an agent is first created; if a non-harness
+agent already exists, create this one under a new name rather than trying to convert it. Deploy
+`pizza-ordering-agent-copilot` with `azd deploy pizza-ordering-agent-copilot --no-prompt` after
+selecting the intended Foundry project and enabling the harness preview. The optional
+`tools/Configure-PizzaAgent.ps1` REST helper validates project scope, renders the template, and
+submits it with the required `MicrosoftCopilot=V1Preview` feature header; its default agent name is
+`pizza-ordering-agent-copilot`. Both paths use the current Azure identity for `https://ai.azure.com`;
+do not place access tokens in files/source. The agent exposes only catalog reads and order creation,
+not catalog administration, and requires live IDs plus explicit order confirmation.
 
 Invoke through the agent's OpenAI responses endpoint
-`{projectEndpoint}/agents/pizza-ordering-agent/endpoint/protocols/openai/responses?api-version=v1`.
+`{projectEndpoint}/agents/{agentName}/endpoint/protocols/openai/responses?api-version=v1`.
 Prove a real catalog tool call and confirmed synthetic order tool call; compare the returned order
 ID with `/api/orders/{id}` and the Orders website. A plausible assistant message is not proof.
 The source API reference remains available on each app at `/api-docs`.
@@ -189,10 +194,10 @@ Before provisioning:
    ```powershell
    $env:AZD_ALPHA_ENABLE_AGENTS_MANAGED_HARNESS = 'true'
    $env:AZURE_DEV_USER_AGENT = 'microsoft_foundry_skill'
-   azd deploy pizza-ordering-agent --no-prompt
+   azd deploy pizza-ordering-agent-copilot --no-prompt
    ```
 
-Deployment verification recorded on 2026-11-04: `gpt-5-mini` provisioned successfully with the configuration above, and agent version 2 is active with the Copilot harness, pinned skill version 1, OpenAPI tools, and web search. The original `gpt-4-1-mini` deployment remains intact. **The live agent catalog invocation completed successfully**, returning Capricciosa at 13.80 and Diavola at 13.20; both names, prices, and availability were independently checked against the live API. The app's `/`, `/orders`, `/health/ready`, and live catalog returned HTTP 200; SQL schema and reader/writer grants were applied through the private endpoint, and the synthetic order lifecycle persisted successfully. The read-only agent smoke test did not create an order and does not separately prove wine-search behavior.
+Deployment verification recorded on 2026-11-06: the original `pizza-ordering-agent` was replaced by the separately created `pizza-ordering-agent-copilot`; its active version 2 retains the Copilot harness, skill version 1, both project-connected OpenAPI tools, and web search. The live catalog smoke test returned available Margherita at 10.50, matching the Catalog API. No order was submitted by this smoke test. The original `gpt-4-1-mini` deployment remains intact. Earlier checks also verified the app's `/`, `/orders`, `/health/ready`, and live catalog, applied SQL schema and reader/writer grants through the private endpoint, and persisted a synthetic order lifecycle. Wine-search behavior has not been separately smoke-tested.
 
 The initial capacity 10 (10,000 TPM/10 RPM) hit model rate limits during multi-step skill/tool calls. After explicit user approval, capacity was increased to 100 (100,000 TPM/100 RPM), resolving the invocation failure. This is a PAYG rate-limit allocation, not PTU; it permits higher usage and is not a spending cap. An intermittent HTTP/2 transport failure was avoided with `$env:GODEBUG = 'http2client=0'` in the invoking PowerShell process only. Request-level token controls are not a substitute in the current preview: the service rejects `reasoning` overrides when an agent is specified and rejects `max_output_tokens` for the Copilot harness. Do not silently increase capacity, remove the skill, or substitute a different harness.
 

@@ -8,11 +8,11 @@ services:
     docker:
       path: ./Dockerfile
 
-  pizza-ordering-agent:
+  pizza-ordering-agent-copilot:
     project: .
     host: azure.ai.agent
     kind: prompt
-    name: pizza-ordering-agent
+    name: pizza-ordering-agent-copilot
     model: gpt-5-mini
     instructions: |
       You are the pizza ordering assistant. Help customers browse the live pizza
@@ -34,18 +34,20 @@ services:
     harness:
       type: microsoft_copilot_preview
     tools:
+      - type: microsoft_copilot_toolset_preview
+        defaultConfig:
+          enabled: false
       - type: openapi
         openapi:
-          name: pizza-ordering-api
-          description: Browse the pizza menu and submit a customer-confirmed order.
+          name: pizza-catalog
+          description: Read the live pizza catalog before recommendations or orders.
           spec:
             openapi: 3.0.3
             info:
-              title: Pizza Ordering API
+              title: Pizza Catalog
               version: 1.0.0
             servers:
-              - url: https://pizza-pizza-dev-1105-u73lzv5y.politecoast-c2201c00.swedencentral.azurecontainerapps.io
-                description: Deployed pizza web and ordering API.
+              - url: https://pizza-catalog.proudflower-ac7d0444.swedencentral.azurecontainerapps.io
             paths:
               /api/catalog/pizzas:
                 get:
@@ -60,6 +62,7 @@ services:
                             type: array
                             items:
                               type: object
+                              required: [id, name, description, price, imageUrl, isAvailable]
                               properties:
                                 id: { type: string, format: uuid }
                                 name: { type: string }
@@ -67,38 +70,57 @@ services:
                                 price: { type: number, format: double }
                                 imageUrl: { type: string }
                                 isAvailable: { type: boolean }
-                              required: [id, name, description, price, imageUrl, isAvailable]
+                    "503":
+                      description: Rate limit or service unavailable; do not invent results.
+          auth:
+            type: project_connection
+            security_scheme:
+              project_connection_id: /subscriptions/80214fc0-7aff-43b6-bbff-cf81a36cbb10/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/ai-pizza-22df-k5ihazv/projects/pizza-ordering-agent/connections/pizza-catalog
+      - type: openapi
+        openapi:
+          name: pizza-orders
+          description: Create a confirmed synthetic demo delivery order.
+          spec:
+            openapi: 3.0.3
+            info:
+              title: Pizza Orders
+              version: 1.0.0
+            servers:
+              - url: https://pizza-orders.proudflower-ac7d0444.swedencentral.azurecontainerapps.io
+            paths:
               /api/orders/:
                 post:
                   operationId: createDeliveryOrder
-                  summary: Place an order after the customer confirms its details
+                  description: Submit only after explicit user confirmation.
+                  summary: Place an order
                   requestBody:
                     required: true
                     content:
                       application/json:
                         schema:
                           type: object
+                          required: [customerName, customerAddress, items]
                           properties:
-                            customerName: { type: string, maxLength: 120 }
-                            customerAddress: { type: string, maxLength: 500 }
+                            customerName: { type: string, minLength: 1, maxLength: 120 }
+                            customerAddress: { type: string, minLength: 1, maxLength: 500 }
                             items:
                               type: array
                               minItems: 1
                               maxItems: 20
                               items:
                                 type: object
+                                required: [pizzaId, quantity]
                                 properties:
                                   pizzaId: { type: string, format: uuid }
                                   quantity: { type: integer, minimum: 1, maximum: 50 }
-                                required: [pizzaId, quantity]
-                          required: [customerName, customerAddress, items]
                   responses:
                     "201":
-                      description: Order created.
+                      description: Order created with the real ID and current price snapshot.
                       content:
                         application/json:
                           schema:
                             type: object
+                            required: [id, customer, items, status, createdAt, total]
                             properties:
                               id: { type: string, format: uuid }
                               customer:
@@ -113,18 +135,22 @@ services:
                                   properties:
                                     pizzaId: { type: string, format: uuid }
                                     pizzaName: { type: string }
-                                    unitPrice: { type: number, format: double }
+                                    unitPrice: { type: number }
                                     quantity: { type: integer }
-                                    lineTotal: { type: number, format: double }
+                                    lineTotal: { type: number }
                               status:
                                 type: string
                                 enum: [New, Preparing, OutForDelivery, Completed]
                               createdAt: { type: string, format: date-time }
-                              total: { type: number, format: double }
+                              total: { type: number }
                     "400":
-                      description: Invalid customer, item, or quantity.
+                      description: Invalid customer, unavailable pizza or quantity.
+                    "503":
+                      description: Rate limit or service unavailable; unknown delivery must not be retried.
           auth:
-            type: anonymous
+            type: project_connection
+            security_scheme:
+              project_connection_id: /subscriptions/80214fc0-7aff-43b6-bbff-cf81a36cbb10/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/ai-pizza-22df-k5ihazv/projects/pizza-ordering-agent/connections/pizza-orders
       - type: web_search
     skills:
       - name: pizza-ordering-guidance
