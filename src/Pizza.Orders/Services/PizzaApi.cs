@@ -7,8 +7,8 @@ public static class PizzaApi
     public static void MapPizzaApi(this WebApplication app)
     {
         var orders = app.MapGroup("/api/orders").WithTags("Pizza orders").RequireRateLimiting("pizza-api");
-        orders.MapGet("/", async (OrderService service, CancellationToken token) =>
-            Results.Ok(await service.GetAllAsync(token)));
+        orders.MapGet("/", async (OrderStatus? status, OrderService service, CancellationToken token) =>
+            Results.Ok(await service.GetAllAsync(status, token)));
         orders.MapGet("/{id:guid}", async (Guid id, OrderService service, CancellationToken token) =>
         {
             var order = await service.GetAsync(id, token);

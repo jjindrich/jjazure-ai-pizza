@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PizzaKoordinator.Api/PizzaKoordinator.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PizzaKoordinator.Tests/PizzaKoordinator.Tests.csproj" />
+  </Folder>
+</Solution>

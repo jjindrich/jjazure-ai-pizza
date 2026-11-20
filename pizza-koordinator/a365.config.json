@@ -1,0 +1,12 @@
+{
+  "tenantId": "b48accae-439a-467a-9fbf-8ad011508424",
+  "clientAppId": "f54280f4-395e-4ea8-9e48-bf2d4952aa14",
+  "environment": "prod",
+  "graphBaseUrl": "https://graph.microsoft.com",
+  "authorityHost": null,
+  "agentIdentityDisplayName": "PizzaKoordinator Identity",
+  "agentBlueprintDisplayName": "PizzaKoordinator Blueprint",
+  "agentDescription": "PizzaKoordinator",
+  "aiTeammate": true,
+  "useBlueprint": null
+}

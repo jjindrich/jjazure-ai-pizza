@@ -1,0 +1,5 @@
+bin/
+obj/
+.azure/
+.local/
+a365.generated.config.json

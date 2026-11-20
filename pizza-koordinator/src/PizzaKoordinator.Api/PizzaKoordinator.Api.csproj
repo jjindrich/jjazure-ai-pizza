@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);NU1605;NU1903;OPENAI001</NoWarn>
+    <RestoreNoWarn>$(RestoreNoWarn);NU1605;NU1903</RestoreNoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Teams.Apps" Version="2.2.1" />
+    <PackageReference Include="Azure.AI.Extensions.OpenAI" Version="3.0.0-beta.1" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" Aliases="AzureIdentity" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.2.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Validators" Version="8.23.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Pizza.Contracts\Pizza.Contracts.csproj" />
+    <InternalsVisibleTo Include="PizzaKoordinator.Tests" />
+  </ItemGroup>
+</Project>

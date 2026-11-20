@@ -10,6 +10,12 @@ public sealed class OrderService(
     public Task<IReadOnlyList<PizzaOrder>> GetAllAsync(CancellationToken cancellationToken) =>
         orders.GetAllAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PizzaOrder>> GetAllAsync(OrderStatus? status, CancellationToken cancellationToken)
+    {
+        var all = await orders.GetAllAsync(cancellationToken);
+        return status is null ? all : all.Where(order => order.Status == status).ToArray();
+    }
+
     public Task<PizzaOrder?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         orders.GetAsync(id, cancellationToken);
 

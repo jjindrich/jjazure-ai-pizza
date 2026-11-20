@@ -62,6 +62,22 @@ public sealed class OrderServiceTests
     }
 
     [Fact]
+    public async Task GetAllAsync_FiltersByStatus()
+    {
+        var catalog = new InMemoryPizzaCatalogStore();
+        var pizza = new PizzaItem(Guid.NewGuid(), "Margherita", "Tomato and mozzarella", 12m, "/pizza.svg");
+        await catalog.SaveAsync(pizza, CancellationToken.None);
+        var service = new OrderService(new InMemoryOrderStore(), catalog, TimeProvider.System);
+        var request = new CreateOrderRequest("Ada", "1 Main Street", [new OrderItemRequest(pizza.Id, 1)]);
+        var fresh = await service.CreateAsync(request, CancellationToken.None);
+        var preparing = await service.CreateAsync(request, CancellationToken.None);
+        await service.UpdateStatusAsync(preparing.Id, OrderStatus.Preparing, CancellationToken.None);
+
+        Assert.Equal(fresh.Id, Assert.Single(await service.GetAllAsync(OrderStatus.New, CancellationToken.None)).Id);
+        Assert.Equal(2, (await service.GetAllAsync(null, CancellationToken.None)).Count);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsInvalidQuantity()
     {
         var catalog = new InMemoryPizzaCatalogStore();

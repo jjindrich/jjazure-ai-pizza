@@ -8,6 +8,9 @@
 !src/Pizza.Orders/**
 !src/Pizza.Catalog/
 !src/Pizza.Catalog/**
+!pizza-koordinator/
+!pizza-koordinator/src/
+!pizza-koordinator/src/**
 !tools/
 !tools/Pizza.SqlInitializer/
 !tools/Pizza.SqlInitializer/**

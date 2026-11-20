@@ -90,7 +90,7 @@
         <table class="table">
             <thead><tr><th>Method and route</th><th>Request</th><th>Success response</th><th>Errors</th></tr></thead>
             <tbody>
-                <tr><td><code>GET /api/orders/</code></td><td>None</td><td>200: PizzaOrder[] (empty array when no orders)</td><td></td></tr>
+                <tr><td><code>GET /api/orders/</code></td><td>Optional <code>?status=New|Preparing|OutForDelivery|Completed</code></td><td>200: PizzaOrder[] (empty array when no orders)</td><td>400: invalid status</td></tr>
                 <tr><td><code>GET /api/orders/{id}</code></td><td>UUID path parameter</td><td>200: PizzaOrder</td><td>404: not found</td></tr>
                 <tr><td><code>POST /api/orders/</code></td><td>CreateOrderRequest</td><td>201: PizzaOrder; Location header points to the new order</td><td>400: validation problem; 503: catalog unavailable</td></tr>
                 <tr><td><code>PUT /api/orders/{id}/status</code></td><td>UpdateOrderStatusRequest</td><td>200: updated PizzaOrder</td><td>400: validation problem; 404: not found</td></tr>
