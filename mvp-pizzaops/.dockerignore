@@ -1,0 +1,17 @@
+.git/
+.local/
+.azure/
+**/bin/
+**/obj/
+**/*.user
+**/*.suo
+**/appsettings.Development.json
+.env
+.env.*
+a365*.json
+deployment-output.json
+docs/
+teams/
+tests/
+foundry/
+foundry-skills/

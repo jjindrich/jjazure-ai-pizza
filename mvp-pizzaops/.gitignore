@@ -1,0 +1,8 @@
+bin/
+obj/
+.azure/
+.local/
+deployment-output.json
+a365.generated.config.json
+teams/pizzaops-agent-factory/color.png
+teams/pizzaops-agent-factory/outline.png

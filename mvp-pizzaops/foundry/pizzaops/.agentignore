@@ -1,0 +1,5 @@
+.azure/
+.env
+.env.*
+bin/
+obj/

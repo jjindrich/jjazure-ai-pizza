@@ -1,0 +1,31 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.30/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.30",
+  "version": "1.0.0",
+  "id": "7f1a7f44-0c2c-4c62-a3b9-c1ca0f8ca54b",
+  "developer": {
+    "name": "JJ Azure PizzaOps",
+    "websiteUrl": "https://azure.microsoft.com",
+    "privacyUrl": "https://www.microsoft.com/privacy/data-privacy-notice",
+    "termsOfUseUrl": "https://www.microsoft.com/servicesagreement"
+  },
+  "name": {
+    "short": "PizzaOps Preview",
+    "full": "PizzaOps Agentic User Preview"
+  },
+  "description": {
+    "short": "Tenant-preview PizzaOps agentic user bridge.",
+    "full": "Tenant-restricted preview app for PizzaOps task coordination through Teams and Microsoft Graph."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#5B2C6F",
+  "agenticUserTemplates": [
+    {
+      "id": "pizzaops-agentic-user-template",
+      "file": "agentic-user.template.json"
+    }
+  ]
+}
