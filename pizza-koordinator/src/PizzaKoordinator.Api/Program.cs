@@ -41,9 +41,7 @@ builder.Services.AddAuthorization(auth => auth.AddPolicy("tools", policy =>
 {
     if (localBypass) { policy.RequireAssertion(_ => true); return; }
     policy.AddAuthenticationSchemes("Tools").RequireAuthenticatedUser()
-        .RequireAssertion(ctx =>
-            ctx.User.FindFirst("tid")?.Value == options.AllowedTenantId &&
-            (ctx.User.FindFirst("azp") ?? ctx.User.FindFirst("appid"))?.Value == options.ToolClientId);
+        .RequireAssertion(ctx => options.IsToolCaller(ctx.User));
 }));
 
 var app = builder.Build();

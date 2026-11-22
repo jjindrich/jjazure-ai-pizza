@@ -2,16 +2,16 @@
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.30/MicrosoftTeams.schema.json",
   "manifestVersion": "1.30",
   "version": "1.0.0",
-  "id": "3c8f6a52-9d1e-4b7a-a0c4-6e2f1d9b5a73",
+  "id": "cc6cd254-a9a5-4212-a60d-fc494825cd4a",
   "developer": {
-    "name": "JJ Azure PizzaKoordinator",
+    "name": "JJ Azure Pizza Koordinator",
     "websiteUrl": "https://azure.microsoft.com",
     "privacyUrl": "https://www.microsoft.com/privacy/data-privacy-notice",
     "termsOfUseUrl": "https://www.microsoft.com/servicesagreement"
   },
   "name": {
-    "short": "PizzaKoordinator",
-    "full": "PizzaKoordinator - koordinace rozvozu pizzy"
+    "short": "Pizza Koordinator",
+    "full": "Pizza Koordinator - koordinace rozvozu pizzy"
   },
   "description": {
     "short": "Autonomní koordinátor rozvozu pizzy.",
@@ -24,7 +24,7 @@
   "accentColor": "#B5371F",
   "agenticUserTemplates": [
     {
-      "id": "pizzakoordinator-agentic-user-template",
+      "id": "pizza-koordinator-agentic-user-template",
       "file": "agentic-user.template.json"
     }
   ]

@@ -2,7 +2,8 @@
 
 Blazor Web App and JSON API for a pizza catalog and delivery orders, plus a Microsoft Foundry Managed Harness Agent definition. The catalog is backed by Azure Cosmos DB, uploaded images by a private Azure Blob container, and orders by Azure SQL when running in Azure. Local development uses an in-memory catalog/orders store and seeds ten menu items.
 
-[`pizza-koordinator/`](pizza-koordinator/README.md) contains **PizzaKoordinator**, an autonomous Teams agent that coordinates delivery of new orders between couriers.
+[`pizza-koordinator/`](pizza-koordinator/README.md) contains **Pizza Koordinator**, an autonomous Teams agent that coordinates delivery of new orders between couriers.
+
 ## Run and test locally
 
 Requires the .NET 10 SDK.

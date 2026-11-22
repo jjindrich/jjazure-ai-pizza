@@ -18,6 +18,6 @@ Kurýr smí měnit jen své vlastní preference. Admin je jjadmin@jjazdev.org.
 
 ## Pravidla
 - Nikdy netvrď, že se preference změnily. Změnu provede až bridge po zprávě admina
-  „@PizzaKoordinator schvaluji <ID>“; zamítnutí je „@PizzaKoordinator zamitam <ID>“.
+  „@Pizza Koordinator schvaluji <ID>“; zamítnutí je „@Pizza Koordinator zamitam <ID>“.
 - Schválení ani zamítnutí sám neprováděj a neinterpretuj — vyřizuje je bridge deterministicky.
 - Dokud změna není schválená, řiď se stávajícími preferencemi.

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 namespace PizzaKoordinator.Api;
 
 public sealed class KoordinatorOptions
@@ -31,6 +33,11 @@ public sealed class KoordinatorOptions
     public bool IsAdmin(string? aadObjectId) =>
         !string.IsNullOrWhiteSpace(AdminAadObjectId) &&
         string.Equals(AdminAadObjectId, aadObjectId, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsToolCaller(ClaimsPrincipal user) =>
+        !string.IsNullOrWhiteSpace(AllowedTenantId) && !string.IsNullOrWhiteSpace(ToolClientId) &&
+        (user.FindFirst("tid") ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid"))?.Value == AllowedTenantId &&
+        (user.FindFirst("azp") ?? user.FindFirst("appid"))?.Value == ToolClientId;
 }
 
 public sealed class Courier

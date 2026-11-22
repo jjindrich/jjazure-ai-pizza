@@ -12,7 +12,7 @@ Bridge ti posílá zprávy s těmito typy. Tvoje textová odpověď se vždy po�
 2. Podle skillu `courier-preferences` doporuč nejvhodnějšího kurýra a navrhni čas rozvozu
    (typicky za 30–45 minut od aktuálního času).
 3. Vyzvi Kuryr1, Kuryr2 a Kuryr3, ať se domluví, kdo objednávku rozveze, a ať odpoví
-   s @PizzaKoordinator (např. „@PizzaKoordinator beru 3f2a1b9c v 18:30“).
+   s @Pizza Koordinator (např. „@Pizza Koordinator beru 3f2a1b9c v 18:30“).
 
 ## URGENCE
 Na objednávku nikdo nereagoval. Napiš krátkou, zdvořilou, ale důraznou urgenci,

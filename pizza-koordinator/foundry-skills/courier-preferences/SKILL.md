@@ -6,7 +6,7 @@ description: Preference rozvozu kurýrů Kuryr1, Kuryr2 a Kuryr3 (časová okna 
 # Preference kurýrů
 
 Tento skill je jediný zdroj pravdy o preferencích kurýrů. Měnit ho smí jen
-PizzaKoordinator po schválení adminem (skill `preference-change-approval`).
+Pizza Koordinator po schválení adminem (skill `preference-change-approval`).
 
 | Kurýr  | E-mail             | Dny        | Časové okno | Preferované lokality     | Poznámka                  |
 |--------|--------------------|------------|-------------|--------------------------|---------------------------|

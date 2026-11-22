@@ -4,9 +4,9 @@
   "environment": "prod",
   "graphBaseUrl": "https://graph.microsoft.com",
   "authorityHost": null,
-  "agentIdentityDisplayName": "PizzaKoordinator Identity",
-  "agentBlueprintDisplayName": "PizzaKoordinator Blueprint",
-  "agentDescription": "PizzaKoordinator",
+  "agentIdentityDisplayName": "Pizza Koordinator Identity",
+  "agentBlueprintDisplayName": "Pizza Koordinator Blueprint",
+  "agentDescription": "Pizza Koordinator",
   "aiTeammate": true,
   "useBlueprint": null
 }

@@ -4,20 +4,21 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 $koordinatorRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repoRoot = Split-Path $koordinatorRoot -Parent
 $templateRoot = Join-Path $koordinatorRoot 'teams'
 $staging = Join-Path $koordinatorRoot '.local\agent-template'
 $package = Join-Path $koordinatorRoot '.local\pizzakoordinator-agent-template-1.0.0.zip'
 
-# Icons come from the MVP generator (its outputs are git-ignored there).
+# Run a copy of the MVP generator, leaving the MVP directory untouched.
 $mvpTemplate = Join-Path $repoRoot 'mvp-pizzaops\teams\pizzaops-agent-factory'
-& python (Join-Path $mvpTemplate 'generate_icons.py')
-
 Remove-Item $staging, $package -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
+Copy-Item (Join-Path $mvpTemplate 'generate_icons.py') $staging
+try { & python (Join-Path $staging 'generate_icons.py') }
+finally { Remove-Item -LiteralPath (Join-Path $staging 'generate_icons.py') -Force }
 Copy-Item (Join-Path $templateRoot 'manifest.preview.json') (Join-Path $staging 'manifest.json')
-Copy-Item (Join-Path $mvpTemplate 'color.png'), (Join-Path $mvpTemplate 'outline.png') $staging
 
 $agentic = Get-Content (Join-Path $templateRoot 'agentic-user.template.json') -Raw | ConvertFrom-Json
 $agentic.agentIdentityBlueprintId = $BlueprintId

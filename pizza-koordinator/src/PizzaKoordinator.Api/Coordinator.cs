@@ -33,10 +33,14 @@ public sealed class Coordinator(
     {
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(activity));
         var root = document.RootElement;
+        var channelId = Get(root, "channelId");
+        var type = Get(root, "conversation", "conversationType") ?? "";
+        logger.LogInformation("Received activity from channel {ChannelId} with conversation type {ConversationType}",
+            channelId ?? "(missing)", type);
         var identity = JsonSerializer.Deserialize<ChannelAccount>(root.GetProperty("recipient").GetRawText())?.GetAgenticIdentity()
             ?? throw new InvalidDataException("Teams activity has no Agentic Identity on its recipient.");
-        var type = Get(root, "conversation", "conversationType") ?? "";
-        if (type == "channel" || state.Channel is null)
+        if (string.Equals(channelId, "msteams", StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(type, "channel", StringComparison.OrdinalIgnoreCase) || state.Channel is null))
             state.Channel = new ChannelIdentity(
                 Get(root, "channelData", "tenant", "id") ?? "",
                 Get(root, "conversation", "id") ?? throw new InvalidDataException("Teams activity has no conversation."),
@@ -111,7 +115,7 @@ public sealed class Coordinator(
                 attendees = new[] { new { emailAddress = new { address = courier.Email, name = courier.Name }, type = "required" } }
             }, ct);
             state.Get(order.Id)!.EventId = eventId;
-            await graph.SendMailAsync(channel, options.AdminEmail, $"PizzaKoordinator: {courier.Name} rozveze objednavku {Short(order.Id)}",
+            await graph.SendMailAsync(channel, options.AdminEmail, $"Pizza Koordinator: {courier.Name} rozveze objednavku {Short(order.Id)}",
                 $"Kuryr: {courier.Name} ({courier.Email})\nCas: {Local(start)} - {Local(end):HH:mm}\n\n{Describe(order)}", ct);
             return Results.Ok(new { order.Id, courier = courier.Name, start = Local(start), end = Local(end), invitationSent = true, adminNotified = true });
         }
@@ -151,11 +155,11 @@ public sealed class Coordinator(
             Navrhovane zmeny skillu {options.PreferencesSkillName}:
             {diff}
 
-            Admin ({options.AdminEmail}) schvali zpravou "@PizzaKoordinator schvaluji {change.Id}" nebo zamitne "@PizzaKoordinator zamitam {change.Id}".
+            Admin ({options.AdminEmail}) schvali zpravou "@Pizza Koordinator schvaluji {change.Id}" nebo zamitne "@Pizza Koordinator zamitam {change.Id}".
             """;
         await PostAsync(text, ct);
         if (state.Channel is { } channel)
-            await graph.SendMailAsync(channel, options.AdminEmail, $"PizzaKoordinator: schvaleni zmeny preferenci {courier.Name} ({change.Id})", text, ct);
+            await graph.SendMailAsync(channel, options.AdminEmail, $"Pizza Koordinator: schvaleni zmeny preferenci {courier.Name} ({change.Id})", text, ct);
         return Results.Ok(new { change.Id, status = "ceka na schvaleni adminem", diff });
     }
 

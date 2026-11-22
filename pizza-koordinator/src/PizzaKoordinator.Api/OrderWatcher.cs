@@ -23,14 +23,23 @@ public sealed class OrderWatcher(
     {
         if (state.Channel is null) return;
 
-        foreach (var order in await orders.GetNewAsync(ct))
+        var newOrders = await orders.GetNewAsync(ct);
+        state.RetainPendingAnnouncements(newOrders.Select(order => order.Id).ToHashSet());
+        foreach (var order in newOrders)
         {
             if (!state.TryTrack(order.Id)) continue;
-            try { await coordinator.AnnounceAsync(order, ct); }
+            try
+            {
+                await coordinator.AnnounceAsync(order, ct);
+                state.AnnouncementSent(order.Id);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
-                state.Forget(order.Id); // retried on the next tick
-                logger.LogError(ex, "Announcing order {OrderId} failed", order.Id);
+                if (state.DelayAnnouncement(order.Id) is { } delay)
+                    logger.LogError(ex, "Announcing order {OrderId} failed; retrying after {Delay}", order.Id, delay);
+                else
+                    logger.LogError(ex, "Announcing order {OrderId} failed after it was assigned; no retry scheduled", order.Id);
             }
         }
 

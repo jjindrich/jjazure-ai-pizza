@@ -18,6 +18,7 @@ public sealed class CoordinatorState(TimeProvider time)
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<Guid, TrackedOrder> _orders = [];
+    private readonly Dictionary<Guid, (int Failures, DateTimeOffset RetryAt)> _announcementRetries = [];
     private readonly Dictionary<string, PreferenceChange> _changes = new(StringComparer.OrdinalIgnoreCase);
 
     public ChannelIdentity? Channel { get; set; }
@@ -26,12 +27,50 @@ public sealed class CoordinatorState(TimeProvider time)
     public bool TryTrack(Guid orderId)
     {
         lock (_gate)
+        {
+            if (_announcementRetries.TryGetValue(orderId, out var retry) && retry.RetryAt > time.GetUtcNow())
+                return false;
             return _orders.TryAdd(orderId, new TrackedOrder { OrderId = orderId, LastActivityAt = time.GetUtcNow() });
+        }
     }
 
     public void Forget(Guid orderId)
     {
-        lock (_gate) _orders.Remove(orderId);
+        lock (_gate)
+        {
+            _orders.Remove(orderId);
+            _announcementRetries.Remove(orderId);
+        }
+    }
+
+    internal TimeSpan? DelayAnnouncement(Guid orderId)
+    {
+        lock (_gate)
+        {
+            if (_orders.TryGetValue(orderId, out var order) && order.Courier is not null)
+            {
+                _announcementRetries.Remove(orderId);
+                return null;
+            }
+
+            _orders.Remove(orderId);
+            var failures = _announcementRetries.TryGetValue(orderId, out var retry) ? Math.Min(retry.Failures + 1, 6) : 1;
+            var delay = TimeSpan.FromSeconds(Math.Min(900, 30 * (1 << (failures - 1))));
+            _announcementRetries[orderId] = (failures, time.GetUtcNow() + delay);
+            return delay;
+        }
+    }
+
+    internal void AnnouncementSent(Guid orderId)
+    {
+        lock (_gate) _announcementRetries.Remove(orderId);
+    }
+
+    internal void RetainPendingAnnouncements(IReadOnlySet<Guid> orderIds)
+    {
+        lock (_gate)
+            foreach (var orderId in _announcementRetries.Keys.Where(id => !orderIds.Contains(id)).ToArray())
+                _announcementRetries.Remove(orderId);
     }
 
     public IReadOnlyList<TrackedOrder> Snapshot()

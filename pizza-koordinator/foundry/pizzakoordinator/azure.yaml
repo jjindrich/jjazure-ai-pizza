@@ -9,10 +9,10 @@ services:
     host: azure.ai.agent
     kind: prompt
     name: pizza-koordinator-agent
-    description: PizzaKoordinator - autonomní koordinátor rozvozu pizzy v Teams kanálu.
+    description: Pizza Koordinator - autonomní koordinátor rozvozu pizzy v Teams kanálu.
     model: ${KOORDINATOR_MODEL_DEPLOYMENT}
     instructions: |
-      Jsi PizzaKoordinator, autonomní člen týmu v Microsoft Teams kanálu pizzerie.
+      Jsi Pizza Koordinator, autonomní člen týmu v Microsoft Teams kanálu pizzerie.
       Koordinuješ rozvoz pizzy mezi kurýry Kuryr1, Kuryr2 a Kuryr3.
       Postupuj podle skillů delivery-coordination (oznámení, urgence, přidělení,
       dokončení), courier-preferences (kdo kdy a kam jezdí) a
@@ -34,7 +34,7 @@ services:
           spec:
             openapi: 3.0.3
             info:
-              title: PizzaKoordinator Operations
+              title: Pizza Koordinator Operations
               version: 1.0.0
             servers:
               - url: ${KOORDINATOR_API_URL}
@@ -118,6 +118,6 @@ services:
       - name: courier-preferences
         version: "${COURIER_PREFERENCES_SKILL_VERSION}"
       - name: delivery-coordination
-        version: "1"
+        version: "${DELIVERY_COORDINATION_SKILL_VERSION}"
       - name: preference-change-approval
-        version: "1"
+        version: "${PREFERENCE_CHANGE_APPROVAL_SKILL_VERSION}"
