@@ -1,4 +1,4 @@
-namespace PizzaKoordinator.Api;
+namespace PizzaKoordinator.Worker;
 
 public static class TextDiff
 {

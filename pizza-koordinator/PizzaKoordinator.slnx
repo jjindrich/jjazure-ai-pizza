@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/PizzaKoordinator.Api/PizzaKoordinator.Api.csproj" />
+    <Project Path="src/PizzaKoordinator.Gateway/PizzaKoordinator.Gateway.csproj" />
+    <Project Path="src/PizzaKoordinator.Worker/PizzaKoordinator.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PizzaKoordinator.Tests/PizzaKoordinator.Tests.csproj" />

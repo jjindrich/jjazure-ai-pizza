@@ -1,13 +1,13 @@
 # PizzaOps deployed state
 
-Deployment and Teams reply authentication were updated on 2026-11-20 in tenant
-`b48accae-439a-467a-9fbf-8ad011508424`.
+Deployment and Teams reply authentication were updated on 2026-11-20.
+Tenant-specific IDs are represented by placeholders.
 
 ## Azure
 
 | Resource | Deployed value |
 |---|---|
-| Subscription | `80214fc0-7aff-43b6-bbff-cf81a36cbb10` |
+| Subscription | `<AZURE_SUBSCRIPTION_ID>` |
 | Resource group | `rg-jjazure-ai-mvp-pizzaops` |
 | Region | Sweden Central |
 | API | `https://ca-pizzaops-api-v2.livelysand-b75eab52.swedencentral.azurecontainerapps.io` |
@@ -17,8 +17,8 @@ Deployment and Teams reply authentication were updated on 2026-11-20 in tenant
 | Service Bus queue | `pizzaops-wakeups` |
 | Cosmos database | `pizzaops` (`tasks`, `events`) |
 | Foundry endpoint | `https://ai-pizzaops-mvp-i2jyp62.services.ai.azure.com/api/projects/pizzaops` |
-| Foundry project identity client ID | `de6a798d-6fa8-4114-a89d-882d10029a62` |
-| PizzaOps tool API client ID | `fc0eb307-a003-4545-bf6c-2d1d79fafd78` |
+| Foundry project identity client ID | `<FOUNDRY_PROJECT_CLIENT_ID>` |
+| PizzaOps tool API client ID | `<PIZZAOPS_TOOL_API_CLIENT_ID>` |
 
 The API health endpoint returned `Healthy`. The earlier main app environment
 was not VNet-integrated and could not reach Cosmos DB with public access
@@ -54,13 +54,13 @@ serving buffer.
 
 | Resource | Value |
 |---|---|
-| AI teammate blueprint client ID | `d935a216-c452-4e0b-93e9-96ef4141d64e` |
-| Blueprint service principal | `6dadbaf5-f5bb-4486-aed7-b99bcb698408` |
+| AI teammate blueprint client ID | `<BLUEPRINT_CLIENT_ID>` |
+| Blueprint service principal | `<BLUEPRINT_SERVICE_PRINCIPAL_ID>` |
 | Messaging endpoint | `https://ca-pizzaops-api-v2.livelysand-b75eab52.swedencentral.azurecontainerapps.io/api/messages` |
-| Bridge UAMI client ID | `c3f39f3f-613f-4fb7-9219-85716161cedf` |
-| Bridge UAMI principal ID | `6d82b2a5-c94d-4136-a757-ec71692723ea` |
-| Direct Foundry Teams app | `27cbaae1-2490-4724-9f4f-d65118d7a054` |
-| Direct Foundry publish title | `T_b102dbd8-a11f-d462-1fc4-370ba663c08a` |
+| Bridge UAMI client ID | `<BRIDGE_UAMI_CLIENT_ID>` |
+| Bridge UAMI principal ID | `<BRIDGE_UAMI_PRINCIPAL_ID>` |
+| Direct Foundry Teams app | `<FOUNDRY_TEAMS_APP_ID>` |
+| Direct Foundry publish title | `<FOUNDRY_PUBLISH_TITLE>` |
 
 The A365 CLI reported setup completed successfully, the blueprint was reused on
 the reconciliation run, tenant-wide permissions were granted, and the
@@ -76,12 +76,12 @@ The instance was provisioned with the referenced
 
 | Property | Value |
 |---|---|
-| Agent Identity | `3cfe8c77-57f8-46bb-9565-bbb551dd5237` |
+| Agent Identity | `<AGENT_IDENTITY_ID>` |
 | Agent Identity display name | PizzaOps Identity |
-| Agent User | `b075d28f-6246-4630-aa69-7ef99f2b837f` |
+| Agent User | `<AGENT_USER_ID>` |
 | UPN | `pizzaops@jjazdev.org` |
 | Usage location | CZ |
-| Sponsor | JJ Admin (`63963f49-be4b-46ca-8d95-fa33e9777a22`) |
+| Sponsor | JJ Admin (`<SPONSOR_OBJECT_ID>`) |
 
 The Agent User is enabled as a Member and has `AGENT_365`,
 `Microsoft_365_Copilot`, `Microsoft_365_E5_(no_Teams)`,

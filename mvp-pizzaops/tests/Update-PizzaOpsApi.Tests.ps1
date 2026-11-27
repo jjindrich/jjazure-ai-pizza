@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $script = Join-Path $PSScriptRoot '..\scripts\Update-PizzaOpsApi.ps1'
+$testSubscription = [guid]::NewGuid().ToString()
 $global:pizzaOpsTestDigest = 'sha256:' + ('a' * 64)
 $global:pizzaOpsTestImage = "example.azurecr.io/pizzaops-api@$global:pizzaOpsTestDigest"
 $global:pizzaOpsTestScenario = 'success'
@@ -42,13 +43,13 @@ function global:Invoke-RestMethod {
 }
 
 try {
-    & $script -WhatIf
+    & $script -SubscriptionId $testSubscription -WhatIf
     if ($global:pizzaOpsTestCommands -match '^acr build|^containerapp update') {
         throw 'WhatIf must not build or update.'
     }
 
     $global:pizzaOpsTestCommands.Clear()
-    $result = & $script -Confirm:$false
+    $result = & $script -SubscriptionId $testSubscription -Confirm:$false
     if ($result.Image -ne $global:pizzaOpsTestImage -or $result.Revision -ne 'rev-1' -or $result.Health -ne 'Healthy') {
         throw 'Successful deployment did not return the verified revision and digest.'
     }
@@ -67,9 +68,15 @@ try {
         $global:pizzaOpsTestScenario = $failure
         $global:pizzaOpsTestCommands.Clear()
         $failed = $false
-        try { & $script -Confirm:$false } catch { $failed = $true }
+        try { & $script -SubscriptionId $testSubscription -Confirm:$false } catch { $failed = $true }
         if (-not $failed -or ($global:pizzaOpsTestCommands | Where-Object { $_ -like 'containerapp update*' })) {
             throw "$failure must fail without updating the app."
+        }
+        $global:pizzaOpsTestCommands.Clear()
+        $failed = $false
+        try { & $script -SubscriptionId 'invalid' -Confirm:$false } catch { $failed = $true }
+        if (-not $failed -or $global:pizzaOpsTestCommands.Count -ne 0) {
+            throw 'An invalid subscription must fail before invoking Azure CLI.'
         }
     }
     Write-Host 'Update-PizzaOpsApi script tests passed.'

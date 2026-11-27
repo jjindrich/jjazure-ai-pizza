@@ -1,4 +1,4 @@
-namespace PizzaKoordinator.Api;
+namespace PizzaKoordinator.Worker;
 
 /// <summary>Polls the Orders API for new orders and urges couriers who stay silent.</summary>
 public sealed class OrderWatcher(

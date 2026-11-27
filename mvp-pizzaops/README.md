@@ -29,6 +29,9 @@ To add an Agent 365 instance after the blueprint and template are ready, see
 For example:
 
 ```powershell
+$env:AZURE_TENANT_ID = '<verified-tenant-id>'
+$env:PIZZAOPS_BLUEPRINT_ID = '<verified-blueprint-client-id>'
+$env:PIZZAOPS_SPONSOR_ID = '<verified-sponsor-object-id>'
 .\scripts\Provision-Agent365Instance.ps1 -InstanceName 'pizzaops-workshop' `
   -AgentUpn 'pizzaops-workshop@jjazdev.org' -DisplayName 'PizzaOps Workshop' `
   -MailNickname 'pizzaops-workshop' -DryRun

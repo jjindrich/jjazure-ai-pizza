@@ -2,13 +2,18 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Image,
-    [string]$SubscriptionId = '80214fc0-7aff-43b6-bbff-cf81a36cbb10',
+    [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [string]$ResourceGroup = 'rg-jjazure-ai-pizza-apps',
+    # Gateway only. Sandbox Worker image changes go through Deploy-PizzaKoordinator.ps1 -ReplaceWorker.
     [string]$ContainerApp = 'ca-pizzakoordinator'
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+$parsedSubscription = [guid]::Empty
+if (-not [guid]::TryParse($SubscriptionId, [ref]$parsedSubscription) -or $parsedSubscription -eq [guid]::Empty) {
+    throw 'SubscriptionId must be a non-empty GUID; provide -SubscriptionId or AZURE_SUBSCRIPTION_ID.'
+}
 
 $query = '{image:properties.template.containers[0].image,revision:properties.latestRevisionName,fqdn:properties.configuration.ingress.fqdn}'
 $before = & az containerapp show --subscription $SubscriptionId -g $ResourceGroup -n $ContainerApp --query $query -o json |

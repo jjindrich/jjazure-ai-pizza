@@ -137,10 +137,20 @@ settings are present in `azure.yaml`, with separate Catalog and Orders OpenAPI t
 project connections. The Copilot harness is fixed when an agent is first created; if a non-harness
 agent already exists, create this one under a new name rather than trying to convert it. Deploy
 `pizza-ordering-agent-copilot` with `azd deploy pizza-ordering-agent-copilot --no-prompt` after
-selecting the intended Foundry project and enabling the harness preview. The optional
+selecting the intended Foundry project and enabling the harness preview. Set the two connection
+IDs for that selected azd environment from the verified project resource ID:
+
+```powershell
+$projectResourceId = '<verified-foundry-project-resource-id>'
+azd env set PIZZA_CATALOG_CONNECTION_ID "$projectResourceId/connections/pizza-catalog"
+azd env set PIZZA_ORDERS_CONNECTION_ID "$projectResourceId/connections/pizza-orders"
+```
+
+The optional
 `tools/Configure-PizzaAgent.ps1` REST helper validates project scope, renders the template, and
 submits it with the required `MicrosoftCopilot=V1Preview` feature header; its default agent name is
-`pizza-ordering-agent-copilot`. Both paths use the current Azure identity for `https://ai.azure.com`;
+`pizza-ordering-agent-copilot`. Supply the explicitly approved subscription as `-SubscriptionId`
+or `AZURE_SUBSCRIPTION_ID` and select that same subscription in Azure CLI. Both paths use the current Azure identity for `https://ai.azure.com`;
 do not place access tokens in files/source. The agent exposes only catalog reads and order creation,
 not catalog administration, and requires live IDs plus explicit order confirmation.
 

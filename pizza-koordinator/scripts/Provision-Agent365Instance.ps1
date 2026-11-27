@@ -2,13 +2,18 @@
 param(
     [ValidatePattern('^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$')]
     [string]$AgentUpn = 'pizzakoordinator@jjazdev.org',
-    [guid]$TenantId = 'b48accae-439a-467a-9fbf-8ad011508424',
+    [string]$TenantId = $env:AZURE_TENANT_ID,
     [ValidatePattern('^[A-Z]{2}$')]
     [string]$UsageLocation = 'CZ'
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+$parsedTenant = [guid]::Empty
+if (-not [guid]::TryParse($TenantId, [ref]$parsedTenant) -or $parsedTenant -eq [guid]::Empty) {
+    throw 'TenantId must be a non-empty GUID; provide -TenantId or AZURE_TENANT_ID.'
+}
+$TenantId = $parsedTenant.ToString()
 Write-Warning 'This script creates Entra directory objects only. Graph user creation does not provision Teams or a mailbox; use the Agent 365 onboarding workflow for a full instance.'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $statePath = Join-Path $root '.local\agent365\instance.pizzakoordinator.json'

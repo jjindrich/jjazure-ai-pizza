@@ -2,6 +2,6 @@
   "$schema": "https://developer.microsoft.com/json-schemas/teams/vDevPreview/MicrosoftTeams.AgenticUser.schema.json",
   "id": "pizzaops-agentic-user-template",
   "schemaVersion": "0.1.0-preview",
-  "agentIdentityBlueprintId": "d935a216-c452-4e0b-93e9-96ef4141d64e",
+  "agentIdentityBlueprintId": "00000000-0000-0000-0000-000000000000",
   "communicationProtocol": "activityProtocol"
 }

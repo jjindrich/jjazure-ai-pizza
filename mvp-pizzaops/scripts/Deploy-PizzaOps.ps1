@@ -1,16 +1,22 @@
 param(
-    [string]$SubscriptionId = '80214fc0-7aff-43b6-bbff-cf81a36cbb10',
+    [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [string]$ResourceGroup = 'rg-jjazure-ai-mvp-pizzaops',
     [string]$Location = 'swedencentral',
     [string]$DeploymentId = 'mvp',
-    [string]$TenantId = 'b48accae-439a-467a-9fbf-8ad011508424',
-    [string]$TeamsBlueprintClientId = 'd935a216-c452-4e0b-93e9-96ef4141d64e',
+    [string]$TenantId = $env:AZURE_TENANT_ID,
+    [string]$TeamsBlueprintClientId = $env:PIZZAOPS_BLUEPRINT_ID,
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$GraphWebhookClientState
 )
 
 $ErrorActionPreference = 'Stop'
+foreach ($name in @('SubscriptionId', 'TenantId', 'TeamsBlueprintClientId')) {
+    $parsed = [guid]::Empty
+    if (-not [guid]::TryParse((Get-Variable $name -ValueOnly), [ref]$parsed) -or $parsed -eq [guid]::Empty) {
+        throw "$name must be a non-empty GUID; provide it as a parameter or environment variable."
+    }
+}
 if ($PSVersionTable.PSVersion -lt [version]'7.3') {
     throw 'PowerShell 7.3 or later is required to stop on native command failures.'
 }
@@ -19,6 +25,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $repoRoot
 try {
     & az account set --subscription $SubscriptionId
+    $accountTenant = & az account show --query tenantId --output tsv
+    if ($accountTenant -ine $TenantId) { throw 'The selected subscription belongs to a different tenant.' }
     $callerObjectId = & az ad signed-in-user show --query id --output tsv
     if ([string]::IsNullOrWhiteSpace($callerObjectId)) {
         throw 'No signed-in Azure user was found.'

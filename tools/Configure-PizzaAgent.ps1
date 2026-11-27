@@ -3,11 +3,16 @@ param(
     [Parameter(Mandatory)][string]$ProjectResourceId,
     [Parameter(Mandatory)][string]$CatalogOrigin,
     [Parameter(Mandatory)][string]$OrdersOrigin,
+    [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9-]{0,62}$')]
     [string]$AgentName = 'pizza-ordering-agent-copilot'
 )
 
 $ErrorActionPreference = 'Stop'
+$parsedSubscription = [guid]::Empty
+if (-not [guid]::TryParse($SubscriptionId, [ref]$parsedSubscription) -or $parsedSubscription -eq [guid]::Empty) {
+    throw 'SubscriptionId must be a non-empty GUID; provide -SubscriptionId or AZURE_SUBSCRIPTION_ID.'
+}
 foreach ($origin in @($CatalogOrigin, $OrdersOrigin)) {
     $uri = [uri]$origin
     if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'https' -or
@@ -15,13 +20,17 @@ foreach ($origin in @($CatalogOrigin, $OrdersOrigin)) {
         throw 'Catalog and Orders must be verified HTTPS origins.'
     }
 }
-if ($ProjectResourceId -notmatch '^/subscriptions/80214fc0-7aff-43b6-bbff-cf81a36cbb10/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/([^/]+)/projects/pizza-ordering-agent$') {
-    throw 'Project must belong to the explicitly approved new subscription/resource group.'
+if ($ProjectResourceId -notmatch "^/subscriptions/$([regex]::Escape($SubscriptionId))/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/([^/]+)/projects/pizza-ordering-agent$") {
+    throw 'Project must belong to the explicitly specified subscription and approved resource group.'
 }
 $accountName = $Matches[1]
 $expectedEndpoint = "https://$accountName.services.ai.azure.com/api/projects/pizza-ordering-agent"
 if ($ProjectEndpoint.TrimEnd('/') -ne $expectedEndpoint) {
     throw 'Project endpoint does not match its approved ARM resource.'
+}
+$accountSubscription = & az account show --query id --output tsv
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($accountSubscription) -or $accountSubscription.Trim() -ine $SubscriptionId) {
+    throw 'Azure CLI must be signed in to the explicitly specified subscription.'
 }
 $root = Split-Path $PSScriptRoot -Parent
 $json = Get-Content (Join-Path $root 'agent\pizza-agent.template.json') -Raw

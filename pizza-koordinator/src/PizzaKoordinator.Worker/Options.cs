@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace PizzaKoordinator.Api;
+namespace PizzaKoordinator.Worker;
 
 public sealed class KoordinatorOptions
 {
@@ -18,7 +18,7 @@ public sealed class KoordinatorOptions
     public int MaxUrges { get; set; } = 5;
     public string? AllowedTenantId { get; set; }
     public string? ToolAudience { get; set; }
-    public string? ToolClientId { get; set; }
+    public string? GatewayClientId { get; set; }
     public bool AllowLocalAuthBypass { get; set; }
     public List<Courier> Couriers { get; set; } = [];
 
@@ -34,10 +34,11 @@ public sealed class KoordinatorOptions
         !string.IsNullOrWhiteSpace(AdminAadObjectId) &&
         string.Equals(AdminAadObjectId, aadObjectId, StringComparison.OrdinalIgnoreCase);
 
-    public bool IsToolCaller(ClaimsPrincipal user) =>
-        !string.IsNullOrWhiteSpace(AllowedTenantId) && !string.IsNullOrWhiteSpace(ToolClientId) &&
+    /// <summary>Only the DMZ Gateway's managed identity may call the Worker.</summary>
+    public bool IsGatewayCaller(ClaimsPrincipal user) =>
+        !string.IsNullOrWhiteSpace(AllowedTenantId) && !string.IsNullOrWhiteSpace(GatewayClientId) &&
         (user.FindFirst("tid") ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid"))?.Value == AllowedTenantId &&
-        (user.FindFirst("azp") ?? user.FindFirst("appid"))?.Value == ToolClientId;
+        (user.FindFirst("azp") ?? user.FindFirst("appid"))?.Value == GatewayClientId;
 }
 
 public sealed class Courier

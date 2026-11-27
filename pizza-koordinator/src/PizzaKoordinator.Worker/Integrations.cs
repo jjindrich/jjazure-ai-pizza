@@ -16,7 +16,7 @@ using Microsoft.Teams.Core.Schema;
 using OpenAI.Responses;
 using Pizza.Contracts;
 
-namespace PizzaKoordinator.Api;
+namespace PizzaKoordinator.Worker;
 
 /// <summary>Invokes the Foundry Prompt Agent (Copilot harness) through its agent endpoint.</summary>
 public sealed class FoundryAgent(KoordinatorOptions options, TokenCredential credential, IHttpClientFactory httpClientFactory)
@@ -41,8 +41,14 @@ public sealed class FoundryAgent(KoordinatorOptions options, TokenCredential cre
             .GetProjectResponsesClientForAgentEndpoint(options.FoundryAgentName, conversationId, options: new ProjectOpenAIClientOptions());
         var response = await client.CreateResponseAsync(
             new CreateResponseOptions { InputItems = { ResponseItem.CreateUserMessageItem(text) } }, ct);
-        return response.Value.GetOutputText();
+        return FinalText(response.Value.OutputItems) ?? response.Value.GetOutputText();
     }
+
+    /// <summary>The harness emits commentary messages between tool calls; only the last assistant message is the answer.</summary>
+    internal static string? FinalText(IEnumerable<ResponseItem> items) =>
+        items.OfType<MessageResponseItem>().LastOrDefault(m => m.Role == MessageRole.Assistant) is { } message
+            ? string.Concat(message.Content.Select(c => c.Text)).Trim() is { Length: > 0 } text ? text : null
+            : null;
 
     private async Task<string> CreateConversationAsync(CancellationToken ct)
     {
@@ -130,13 +136,32 @@ internal static class FoundryRest
     }
 }
 
-/// <summary>Microsoft Graph as the PizzaKoordinator agentic user (calendar invites and mail).</summary>
-public sealed class GraphClient(TeamsBotApplication teams, IHttpClientFactory httpClientFactory)
+public sealed record CreatedEvent(string Id, string? OnlineMeetingUrl);
+
+public interface IGraphClient
 {
-    public async Task<string?> CreateEventAsync(ChannelIdentity identity, object graphEvent, CancellationToken ct)
+    Task<CreatedEvent> CreateEventAsync(ChannelIdentity identity, object graphEvent, CancellationToken ct);
+    Task SendMailAsync(ChannelIdentity identity, string to, string subject, string body, CancellationToken ct);
+    Task ReactAsync(ChannelIdentity identity, string messagePath, string reaction, CancellationToken ct);
+}
+
+/// <summary>Microsoft Graph as the PizzaKoordinator agentic user (calendar invites and mail).</summary>
+public sealed class GraphClient(TeamsBotApplication teams, IHttpClientFactory httpClientFactory) : IGraphClient
+{
+    public async Task<CreatedEvent> CreateEventAsync(ChannelIdentity identity, object graphEvent, CancellationToken ct)
     {
         using var response = await SendAsync(identity, "/v1.0/me/events", graphEvent, ct);
-        return (await response.Content.ReadFromJsonAsync<JsonObject>(ct))?["id"]?.ToString();
+        return await ReadCreatedEventAsync(response, ct);
+    }
+
+    internal static async Task<CreatedEvent> ReadCreatedEventAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.StatusCode != HttpStatusCode.Created)
+            throw new InvalidDataException($"Graph returned {(int)response.StatusCode} rather than a created event.");
+        var body = await response.Content.ReadFromJsonAsync<JsonObject>(ct);
+        if (body?["id"] is not JsonValue idValue || !idValue.TryGetValue<string>(out var id) || string.IsNullOrWhiteSpace(id))
+            throw new InvalidDataException("Graph returned no event ID; verify the calendar before retrying.");
+        return new CreatedEvent(id, (body["onlineMeeting"] as JsonObject)?["joinUrl"]?.ToString());
     }
 
     public async Task SendMailAsync(ChannelIdentity identity, string to, string subject, string body, CancellationToken ct)
@@ -153,6 +178,11 @@ public sealed class GraphClient(TeamsBotApplication teams, IHttpClientFactory ht
         }, ct);
     }
 
+    public async Task ReactAsync(ChannelIdentity identity, string messagePath, string reaction, CancellationToken ct)
+    {
+        using var _ = await SendAsync(identity, $"/v1.0/{messagePath}/setReaction", new { reactionType = reaction }, ct);
+    }
+
     private async Task<HttpResponseMessage> SendAsync(ChannelIdentity identity, string path, object payload, CancellationToken ct)
     {
         var token = await teams.GetAgenticGraphTokenAsync(JsonSerializer.Deserialize<AgenticIdentity>(identity.AgenticIdentity)!, ct);
@@ -160,7 +190,12 @@ public sealed class GraphClient(TeamsBotApplication teams, IHttpClientFactory ht
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var response = await httpClientFactory.CreateClient().SendAsync(request, ct);
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Graph {path} failed: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync(ct)}");
+        {
+            var status = response.StatusCode;
+            var error = await response.Content.ReadAsStringAsync(ct);
+            response.Dispose();
+            throw new HttpRequestException($"Graph {path} failed: {(int)status} {error}", null, status);
+        }
         return response;
     }
 }

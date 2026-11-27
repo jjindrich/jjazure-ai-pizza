@@ -36,6 +36,12 @@ param bootstrapEnabled bool
 param catalogImage string
 @description('Orders immutable ACR image; empty disables app creation.')
 param ordersImage string
+@description('Tenant ID allowed to authenticate to the Orders read-only MCP endpoint.')
+param ordersMcpTenantId string
+@description('Audience accepted by the Orders read-only MCP endpoint.')
+param ordersMcpAudience string
+@description('Foundry agent identity client ID allowed to authenticate to Orders MCP.')
+param ordersMcpAllowedClientId string
 @description('Initializer immutable ACR image; empty disables job creation.')
 param initializerImage string
 
@@ -150,6 +156,9 @@ resource orders 'Microsoft.App/containerApps@2025-01-01' = if (!empty(ordersImag
               name: 'Pizza__Azure__SqlConnectionString'
               value: 'Server=tcp:${sqlHost},1433;Database=PizzaOrders;Authentication=Active Directory Managed Identity;User Id=${ordersClientId};Encrypt=True;TrustServerCertificate=False;'
             }
+            { name: 'Pizza__AgentMcp__TenantId', value: ordersMcpTenantId }
+            { name: 'Pizza__AgentMcp__Audience', value: ordersMcpAudience }
+            { name: 'Pizza__AgentMcp__AllowedClientId', value: ordersMcpAllowedClientId }
           ]
         }
       ]

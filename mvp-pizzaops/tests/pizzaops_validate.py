@@ -64,7 +64,8 @@ def test_teams_templates() -> None:
     assert manifest["manifestVersion"].startswith("1.")
     assert manifest.get("agenticUserTemplates")
     assert template["communicationProtocol"] == "activityProtocol"
-    assert template["agentIdentityBlueprintId"] == "d935a216-c452-4e0b-93e9-96ef4141d64e"
+    assert manifest["id"] == "00000000-0000-0000-0000-000000000000"
+    assert template["agentIdentityBlueprintId"] == "00000000-0000-0000-0000-000000000000"
 
 
 def main() -> None:

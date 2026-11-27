@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "pizzaops-provision-test-$([guid]::NewGuid().ToString('N'))"
-$global:pizzaOpsProvisionTenant = 'b48accae-439a-467a-9fbf-8ad011508424'
+$testTenant = [guid]::NewGuid().ToString()
+$testBlueprint = [guid]::NewGuid().ToString()
+$testOwner = [guid]::NewGuid().ToString()
+$global:pizzaOpsProvisionTenant = $testTenant
 $global:pizzaOpsProvisionCalls = [System.Collections.Generic.List[object]]::new()
 $global:pizzaOpsProvisionExitCode = 0
 
@@ -24,6 +27,9 @@ try {
     $sourceCheckout = Join-Path $testRoot 'sample'
     $parameters = @{
         SourceCheckout = $sourceCheckout
+        TenantId = $testTenant
+        BlueprintId = $testBlueprint
+        OwnerId = $testOwner
         InstanceName = 'pizzaops-workshop'
         AgentUpn = 'pizzaops-workshop@example.org'
         DisplayName = 'PizzaOps Workshop'
@@ -70,12 +76,25 @@ try {
         throw 'A mismatched tenant must not invoke the provisioning module.'
     }
 
-    $global:pizzaOpsProvisionTenant = 'b48accae-439a-467a-9fbf-8ad011508424'
+    $global:pizzaOpsProvisionTenant = $testTenant
     $global:pizzaOpsProvisionExitCode = 1
     $failed = $false
     try { & $scriptPath @parameters -Confirm:$false } catch { $failed = $true }
     if (-not $failed -or -not (Test-Path -LiteralPath $binding)) {
         throw 'A module failure must be surfaced and leave the binding intact for recovery.'
+    }
+
+    $legacyState = Join-Path $testRoot '.local\agent365\instance.pizzaops.json'
+    '{"agentUserPrincipalName":"pizzaops@jjazdev.org"}' | Set-Content -LiteralPath $legacyState
+    $callsBefore = $global:pizzaOpsProvisionCalls.Count
+    $failed = $false
+    try {
+        & $scriptPath -SourceCheckout $sourceCheckout -TenantId $testTenant `
+            -BlueprintId $testBlueprint -OwnerId $testOwner -DryRun
+    }
+    catch { $failed = $_.Exception.Message -like '*Unbound existing state*' }
+    if (-not $failed -or $global:pizzaOpsProvisionCalls.Count -ne $callsBefore) {
+        throw 'An unbound existing instance must not be trusted or provisioned automatically.'
     }
     Write-Host 'Provision-Agent365Instance script tests passed.'
 }

@@ -3,10 +3,10 @@ $source = (Resolve-Path (Join-Path $PSScriptRoot '..\scripts\Provision-Agent365I
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "PizzaKoordinatorProvisioning-$([guid]::NewGuid())"
 $statePath = Join-Path $testRoot '.local\agent365\instance.pizzakoordinator.json'
 $scriptPath = Join-Path $testRoot 'scripts\Provision-Agent365Instance.ps1'
-$tenant = 'b48accae-439a-467a-9fbf-8ad011508424'
-$owner = '63963f49-be4b-46ca-8d95-fa33e9777a22'
-$blueprint = '2001462b-309f-4b8e-ba8d-85c3b2dd8943'
-$identity = '9fac1cc6-de81-4bc2-b577-5219a157e89e'
+$tenant = [guid]::NewGuid().ToString()
+$owner = [guid]::NewGuid().ToString()
+$blueprint = [guid]::NewGuid().ToString()
+$identity = [guid]::NewGuid().ToString()
 $global:ProvisionCase = @{
     Scenario = 'replication'; Posts = 0; User = $null
     Skus = @('AGENT_365', 'Microsoft_365_Copilot', 'Microsoft_365_E5_(no_Teams)', 'Microsoft_Teams_Enterprise_New', 'FLOW_FREE') |
@@ -71,7 +71,7 @@ try {
     Copy-Item -LiteralPath $source -Destination $scriptPath
     @{ agentBlueprintId = $blueprint } | ConvertTo-Json | Set-Content (Join-Path $testRoot 'a365.generated.config.json')
     Write-InitialState
-    $result = & $scriptPath -Confirm:$false
+    $result = & $scriptPath -TenantId $tenant -Confirm:$false
     if ($global:ProvisionCase.Posts -ne 2 -or $result.AgentUserId -ne 'new-user') {
         throw 'An explicitly rejected replication request should retry and create one user.'
     }
@@ -80,13 +80,13 @@ try {
     $global:ProvisionCase.User = $null
     Write-InitialState
     $failed = $false
-    try { & $scriptPath -Confirm:$false }
+    try { & $scriptPath -TenantId $tenant -Confirm:$false }
     catch { $failed = $true }
     $saved = Get-Content $statePath -Raw | ConvertFrom-Json
     if (-not $failed -or $global:ProvisionCase.Posts -ne 1 -or -not $saved.userCreationPending) {
         throw 'Unknown creation outcomes must remain pending without a retry.'
     }
-    try { & $scriptPath -Confirm:$false }
+    try { & $scriptPath -TenantId $tenant -Confirm:$false }
     catch {
         if ($_.Exception.Message -notlike '*unknown outcome*') { throw }
     }

@@ -39,6 +39,15 @@ Select a region supported by the Copilot harness and all required Azure
 services. Confirm model quota for a reasoning/tool-calling model. A region
 selection does not reserve quota.
 
+Set `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, and `PIZZAOPS_BLUEPRINT_ID`
+to the verified target GUIDs before running the bootstrap script, or provide
+`-SubscriptionId`, `-TenantId`, and `-TeamsBlueprintClientId`. Registration
+also requires the existing Teams app ID and bridge identity client ID; instance
+provisioning requires the sponsor ID. See
+[agent-template registration](pizzaops-agent-template-registration.md) for
+the explicit variables and parameters. The scripts reject missing or invalid
+IDs before making changes.
+
 ## 2. Build and validate locally
 
 ```powershell
@@ -143,11 +152,10 @@ Follow the current [Teams agent factory setup](https://learn.microsoft.com/micro
    `https://<pizzaops-api-host>/api/messages`.
 4. Declare only the Microsoft Graph calendar permissions required for the
    Agentic User.
-5. Replace all placeholders in
-   `teams/pizzaops-agent-factory/manifest.preview.json` and
-   `teams/pizzaops-agent-factory/agentic-user.template.json`.
-6. Rename the manifest to `manifest.json`, add the required icons, and package the
-   files at ZIP root.
+5. Supply the verified blueprint and Teams app IDs to
+   `scripts\Build-AgentTemplatePackage.ps1`; it replaces placeholders in the
+   generated package without modifying the source templates.
+6. Inspect the generated manifest, blueprint binding and icons in the ZIP.
 7. Publish the factory as a line-of-business Agent 365 app.
 
 Do not commit the blueprint secret. The deployed service uses its managed

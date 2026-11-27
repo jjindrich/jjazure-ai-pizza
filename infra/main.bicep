@@ -27,6 +27,15 @@ param catalogImage string = ''
 @description('ACR Orders image digest; empty means do not create the app.')
 param ordersImage string = ''
 
+@description('Tenant ID allowed to authenticate to the Orders read-only MCP endpoint. Empty disables MCP.')
+param ordersMcpTenantId string = ''
+
+@description('Audience accepted by the Orders read-only MCP endpoint. Empty disables MCP.')
+param ordersMcpAudience string = ''
+
+@description('Foundry agent identity client ID allowed to authenticate to Orders MCP. Empty disables MCP.')
+param ordersMcpAllowedClientId string = ''
+
 @description('ACR initializer image digest; empty means do not create the Job.')
 param initializerImage string = ''
 
@@ -100,6 +109,9 @@ module runtime './modules/runtime.bicep' = {
     bootstrapEnabled: bootstrapEnabled
     catalogImage: catalogImage
     ordersImage: ordersImage
+    ordersMcpTenantId: ordersMcpTenantId
+    ordersMcpAudience: ordersMcpAudience
+    ordersMcpAllowedClientId: ordersMcpAllowedClientId
     initializerImage: initializerImage
   }
 }

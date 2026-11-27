@@ -170,6 +170,15 @@
     <p>Both services provide <code>GET /health/ready</code>: HTTP 200, text <code>Healthy</code>
         when healthy (503 when unhealthy). No external dependency probes are registered, so this
         checks the process, not Cosmos DB, Storage, SQL or Catalog connectivity.</p>
+    <h3>Agent Orders MCP</h3>
+    <p>The Orders service can expose a separate read-only MCP endpoint at <code>/mcp</code> for the
+        PizzaKoordinator Foundry agent. It provides <code>list_new_orders</code> and
+        <code>get_order</code>; both require a bearer token whose audience matches the configured
+        Orders API audience and whose tenant and <code>azp</code> or <code>appid</code> match the
+        configured agent identity. Configure <code>Pizza:AgentMcp:TenantId</code>,
+        <code>Pizza:AgentMcp:Audience</code> and <code>Pizza:AgentMcp:AllowedClientId</code>.
+        The endpoint stays disabled unless all three are configured. These settings secure MCP
+        only; the existing REST endpoints above remain unchanged and unauthenticated.</p>
     <pre><code>curl CATALOG_ORIGIN/health/ready
 curl ORDERS_ORIGIN/health/ready</code></pre>
 </section>

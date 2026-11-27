@@ -75,7 +75,7 @@ services:
           auth:
             type: project_connection
             security_scheme:
-              project_connection_id: /subscriptions/80214fc0-7aff-43b6-bbff-cf81a36cbb10/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/ai-pizza-22df-k5ihazv/projects/pizza-ordering-agent/connections/pizza-catalog
+              project_connection_id: ${PIZZA_CATALOG_CONNECTION_ID}
       - type: openapi
         openapi:
           name: pizza-orders
@@ -150,7 +150,7 @@ services:
           auth:
             type: project_connection
             security_scheme:
-              project_connection_id: /subscriptions/80214fc0-7aff-43b6-bbff-cf81a36cbb10/resourceGroups/rg-jjazure-ai-pizza-apps/providers/Microsoft.CognitiveServices/accounts/ai-pizza-22df-k5ihazv/projects/pizza-ordering-agent/connections/pizza-orders
+              project_connection_id: ${PIZZA_ORDERS_CONNECTION_ID}
       - type: web_search
     skills:
       - name: pizza-ordering-guidance

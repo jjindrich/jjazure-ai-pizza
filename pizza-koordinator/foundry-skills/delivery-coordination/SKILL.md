@@ -22,7 +22,8 @@ připomeň adresu a doporučeného kurýra. Neopakuj celé oznámení.
 - Kurýr převezme objednávku („beru“, „vezmu“, „rozvezu“…): zavolej `assignDelivery`
   s plným `orderId`, jménem kurýra (Kuryr1/2/3) a `deliveryStart` v místním čase
   (`yyyy-MM-ddTHH:mm`). Když kurýr čas neuvede, použij čas, který jsi navrhl.
-  Krátké ID dohledej přes `listDeliveries` nebo z historie konverzace.
+  Aktuální objednávku ověř přes `get_order` a krátké ID dohledávej mezi
+  `list_new_orders` nebo z historie konverzace. Orders MCP je pouze pro čtení.
 - Kurýr hlásí dokončení („doručeno“, „hotovo“, „předáno“…): zavolej `completeDelivery`.
 - Kurýr chce změnit své preference: postupuj podle skillu `preference-change-approval`.
 - Ostatní dotazy zodpověz stručně.

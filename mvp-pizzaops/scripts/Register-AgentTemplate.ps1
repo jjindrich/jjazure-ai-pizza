@@ -1,10 +1,21 @@
 param(
-    [string]$TenantId = 'b48accae-439a-467a-9fbf-8ad011508424',
+    [string]$TenantId = $env:AZURE_TENANT_ID,
     [string]$MessagingEndpoint = 'https://ca-pizzaops-api-v2.livelysand-b75eab52.swedencentral.azurecontainerapps.io/api/messages',
-    [string]$BridgeManagedIdentityClientId = 'c3f39f3f-613f-4fb7-9219-85716161cedf'
+    [string]$BridgeManagedIdentityClientId = $env:PIZZAOPS_BRIDGE_CLIENT_ID,
+    [string]$TeamsAppId = $env:PIZZAOPS_TEAMS_APP_ID
 )
 
 $ErrorActionPreference = 'Stop'
+foreach ($name in @('TenantId', 'BridgeManagedIdentityClientId', 'TeamsAppId')) {
+    $parsed = [guid]::Empty
+    if (-not [guid]::TryParse((Get-Variable $name -ValueOnly), [ref]$parsed) -or $parsed -eq [guid]::Empty) {
+        throw "$name must be a non-empty GUID; provide it as a parameter or environment variable."
+    }
+}
+$accountTenant = & az account show --query tenantId --output tsv
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($accountTenant) -or $accountTenant.Trim() -ine $TenantId) {
+    throw 'Azure CLI must be signed in to the requested tenant before registration.'
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $repoRoot
 try {
@@ -89,7 +100,7 @@ try {
         throw 'Calendar admin consent was not granted for the PizzaOps blueprint.'
     }
 
-    & .\scripts\Build-AgentTemplatePackage.ps1
+    & .\scripts\Build-AgentTemplatePackage.ps1 -BlueprintId $blueprintId -TeamsAppId $TeamsAppId
 
     [ordered]@{
         blueprintId = $blueprintId

@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [string]$SubscriptionId = '80214fc0-7aff-43b6-bbff-cf81a36cbb10',
+    [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [string]$ResourceGroup = 'rg-jjazure-ai-mvp-pizzaops',
     [string]$ContainerApp = 'ca-pizzaops-api-v2',
     [string]$EnvironmentName = 'cae-pizzaops-private-mvp',
@@ -8,6 +8,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$parsedSubscription = [guid]::Empty
+if (-not [guid]::TryParse($SubscriptionId, [ref]$parsedSubscription) -or $parsedSubscription -eq [guid]::Empty) {
+    throw 'SubscriptionId must be a non-empty GUID; provide -SubscriptionId or AZURE_SUBSCRIPTION_ID.'
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 function Invoke-AzChecked {

@@ -34,12 +34,12 @@ Current blueprint:
 
 | Property | Value |
 |---|---|
-| Blueprint client ID | `d935a216-c452-4e0b-93e9-96ef4141d64e` |
-| Blueprint service principal | `6dadbaf5-f5bb-4486-aed7-b99bcb698408` |
+| Blueprint client ID | `<BLUEPRINT_CLIENT_ID>` |
+| Blueprint service principal | `<BLUEPRINT_SERVICE_PRINCIPAL_ID>` |
 | Callback | `https://ca-pizzaops-api-v2.livelysand-b75eab52.swedencentral.azurecontainerapps.io/api/messages` |
-| Bridge UAMI client ID | `c3f39f3f-613f-4fb7-9219-85716161cedf` |
-| Bridge UAMI principal ID / FIC subject | `6d82b2a5-c94d-4136-a757-ec71692723ea` |
-| Tenant | `b48accae-439a-467a-9fbf-8ad011508424` |
+| Bridge UAMI client ID | `<BRIDGE_UAMI_CLIENT_ID>` |
+| Bridge UAMI principal ID / FIC subject | `<BRIDGE_UAMI_PRINCIPAL_ID>` |
+| Tenant | `<AZURE_TENANT_ID>` |
 
 ## Governance gates from the sample
 
@@ -69,9 +69,15 @@ picker flow; the package remains ready for the operator's admin/ALM upload.
 Run:
 
 ```powershell
+$env:AZURE_TENANT_ID = '<verified-tenant-id>'
+$env:PIZZAOPS_BRIDGE_CLIENT_ID = '<verified-bridge-managed-identity-client-id>'
+$env:PIZZAOPS_TEAMS_APP_ID = '<existing-teams-app-id>'
 .\scripts\Register-AgentTemplate.ps1
 ```
 
+For an existing package, use its original Teams app ID to preserve its identity.
+For a new package, choose a new GUID. These values can also be passed as
+`-TenantId`, `-BridgeManagedIdentityClientId`, and `-TeamsAppId`.
 The script resolves the configured managed identity client ID to its principal
 ID and uses that principal ID as the federated credential subject, as required
 by [Microsoft Entra](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-config-app-trust-managed-identity).
@@ -79,7 +85,8 @@ It leaves any older, mismatched credential untouched.
 
 The generated `a365.generated.config.json` contains a protected blueprint
 secret and is ignored by Git. Keep it in the operator's secure workspace. The
-static `a365.config.json` contains no secret and is versioned.
+static `a365.config.json` contains no secret and is versioned with an empty
+tenant ID. The registration script passes the selected tenant explicitly.
 
 ## Create an Agent 365 instance
 
@@ -104,6 +111,9 @@ To create a separate instance, choose a unique instance name, UPN in a verified
 tenant domain, display name and mail nickname:
 
 ```powershell
+$env:AZURE_TENANT_ID = '<verified-tenant-id>'
+$env:PIZZAOPS_BLUEPRINT_ID = '<verified-blueprint-client-id>'
+$env:PIZZAOPS_SPONSOR_ID = '<verified-sponsor-object-id>'
 $instance = @{
   InstanceName = 'pizzaops-workshop'
   AgentUpn = 'pizzaops-workshop@jjazdev.org'
@@ -118,19 +128,20 @@ $instance = @{
 The last command asks for confirmation before creating or reusing identities,
 setting usage location and assigning licenses. Review availability and costs of
 the default licenses first; use `-LicenseSkus` and `-UsageLocation` for a
-different approved set or location. Override `-TenantId`, `-BlueprintId` and
-`-OwnerId` when appropriate. `-DryRun` uses Azure CLI authentication and
+different approved set or location. Alternatively, pass `-TenantId`,
+`-BlueprintId` and `-OwnerId` explicitly. `-DryRun` uses Azure CLI authentication and
 read-only Graph calls, but sends no writes. For a new identity, the upstream
 script stops its preview before dependent user and license calls because the
 new identity ID does not exist yet. `-WhatIf` checks the target without
-calling the provisioning module.
+calling the provisioning module. The tenant, blueprint and sponsor must be
+supplied by these environment variables or the corresponding parameters.
 
-Without instance parameters, the wrapper targets the existing PizzaOps
-instance, not a new one:
+With the required identity settings supplied, omitting instance parameters
+targets the existing PizzaOps instance, not a new one:
 
 ```text
-Blueprint: d935a216-c452-4e0b-93e9-96ef4141d64e
-Sponsor:   63963f49-be4b-46ca-8d95-fa33e9777a22
+Blueprint: <verified-blueprint-client-id>
+Sponsor:   <verified-sponsor-object-id>
 UPN:       pizzaops@jjazdev.org
 Display:   PizzaOps
 Location:  CZ
@@ -141,10 +152,25 @@ Each instance has separate ignored files
 `.local\agent365\instance.<name>.binding.json`. Preserve both: the first stores
 object IDs for retries, while the second binds the state to the tenant,
 blueprint, sponsor and UPN. A mismatch stops the wrapper rather than reusing
-another identity. The original PizzaOps state is accepted only with its known
-original settings and UPN. If a call fails after creation, inspect and preserve
-the partial state before retrying; do not delete it or assume an ambiguous
-network failure created nothing.
+another identity. An older state without a binding is never trusted
+automatically. Restore its original binding from a trusted backup, or first
+verify the state, tenant, blueprint, sponsor and UPN against the original
+records and Graph. Only after that verification, an administrator can create
+the missing ignored `.local\agent365\instance.pizzaops.binding.json` file
+with these verified values:
+
+```json
+{
+  "tenantId": "<verified-tenant-id>",
+  "blueprintId": "<verified-blueprint-client-id>",
+  "ownerId": "<verified-sponsor-object-id>",
+  "agentUpn": "<verified-agent-upn>"
+}
+```
+
+Never overwrite an existing binding. If a call fails after creation, inspect
+and preserve the partial state before retrying; do not delete it or assume an
+ambiguous network failure created nothing.
 
 Verify the instance:
 

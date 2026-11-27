@@ -1,4 +1,4 @@
-namespace PizzaKoordinator.Api;
+namespace PizzaKoordinator.Worker;
 
 public sealed record ChannelIdentity(string TenantId, string ConversationId, string ServiceUrl, string AgenticIdentity);
 
@@ -9,6 +9,7 @@ public sealed class TrackedOrder
     public int Urges { get; set; }
     public string? Courier { get; set; }
     public string? EventId { get; set; }
+    public bool AdminNotified { get; set; }
 }
 
 public sealed record PreferenceChange(string Id, string Courier, string Summary, string NewSkill, string Diff);

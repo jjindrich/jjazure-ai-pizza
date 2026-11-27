@@ -5,19 +5,37 @@ param(
     [Parameter(Mandatory = $true)]
     [Uri]$ApiUrl,
     [Parameter(Mandatory = $true)]
+    [Uri]$OrdersMcpUrl,
+    [Parameter(Mandatory = $true)]
     [string]$ApiAudience,
+    [Parameter(Mandatory = $true)]
+    [string]$OrdersMcpAudience,
     [string]$ModelDeployment = 'gpt-5-mini',
     [string]$EnvironmentName = 'pizzakoordinator',
     [Parameter(Mandatory = $true)]
     [string]$ProjectId,
-    [string]$SubscriptionId = '80214fc0-7aff-43b6-bbff-cf81a36cbb10',
+    [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [string]$ResourceGroup = 'rg-jjazure-ai-pizza-apps',
     [string]$Location = 'swedencentral',
-    [string]$TenantId = 'b48accae-439a-467a-9fbf-8ad011508424'
+    [string]$TenantId = $env:AZURE_TENANT_ID
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+foreach ($name in @('SubscriptionId', 'TenantId')) {
+    $parsed = [guid]::Empty
+    if (-not [guid]::TryParse((Get-Variable $name -ValueOnly), [ref]$parsed) -or $parsed -eq [guid]::Empty) {
+        throw "$name must be a non-empty GUID; provide it as a parameter or AZURE_* environment variable."
+    }
+}
+$projectScope = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/"
+if (-not $ProjectId.StartsWith($projectScope, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'The Foundry project must belong to the requested subscription and resource group.'
+}
+$account = & az account show --output json | ConvertFrom-Json
+if ($account.id -ine $SubscriptionId -or $account.tenantId -ine $TenantId) {
+    throw 'Azure CLI must be signed in to the requested subscription and tenant.'
+}
 $koordinatorRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $sourceManifest = Join-Path $koordinatorRoot 'foundry\pizzakoordinator\azure.yaml'
 $foundryRoot = Join-Path $koordinatorRoot '.local\foundry-deploy'
@@ -48,6 +66,31 @@ try {
     $connectionId = (($connection -join "`n") | ConvertFrom-Json).id
     if ([string]::IsNullOrWhiteSpace($connectionId)) { throw 'The OpenAPI connection returned no resource ID.' }
 
+    $ordersMcpConnectionName = 'pizzakoordinator-orders-mcp'
+    $PSNativeCommandUseErrorActionPreference = $false
+    $ordersMcpConnection = & azd ai connection show $ordersMcpConnectionName --project-endpoint $endpoint --output json 2>$null
+    $PSNativeCommandUseErrorActionPreference = $true
+    if ($LASTEXITCODE -ne 0) {
+        & azd ai connection create $ordersMcpConnectionName --kind remote-tool `
+            --target $OrdersMcpUrl.AbsoluteUri.TrimEnd('/') --auth-type agentic-identity `
+            --audience $OrdersMcpAudience --project-endpoint $endpoint --output json | Out-Null
+        $ordersMcpConnection = & azd ai connection show $ordersMcpConnectionName --project-endpoint $endpoint --output json
+    }
+    $ordersMcpInfo = (($ordersMcpConnection -join "`n") | ConvertFrom-Json)
+    $ordersMcpConnectionId = $ordersMcpInfo.id
+    if ([string]::IsNullOrWhiteSpace($ordersMcpConnectionId)) { throw 'The Orders MCP connection returned no resource ID.' }
+    $ordersMcpResource = & az resource show --ids $ordersMcpConnectionId --api-version 2025-06-01 -o json | ConvertFrom-Json
+    if ($ordersMcpResource.properties.target.TrimEnd('/') -ne $OrdersMcpUrl.AbsoluteUri.TrimEnd('/')) {
+        throw "Existing Orders MCP connection '$ordersMcpConnectionName' targets an unexpected URL."
+    }
+    if ($ordersMcpResource.properties.category -ne 'RemoteTool' -or
+        $ordersMcpResource.properties.authType -ne 'AgenticIdentityToken') {
+        throw "Existing Orders MCP connection '$ordersMcpConnectionName' does not use agentic identity."
+    }
+    if ($ordersMcpResource.properties.audience -ne $OrdersMcpAudience) {
+        throw "Existing Orders MCP connection '$ordersMcpConnectionName' uses an unexpected audience."
+    }
+
     # Skills are created only when missing; the agent uses each skill's default version
     # (courier-preferences keeps whatever version the admin approved last).
     $versions = @{}
@@ -75,6 +118,8 @@ try {
     & azd env set KOORDINATOR_MODEL_DEPLOYMENT $ModelDeployment
     & azd env set KOORDINATOR_API_URL $ApiUrl.AbsoluteUri.TrimEnd('/')
     & azd env set KOORDINATOR_OPENAPI_CONNECTION_ID $connectionId
+    & azd env set ORDERS_MCP_URL $OrdersMcpUrl.AbsoluteUri.TrimEnd('/')
+    & azd env set ORDERS_MCP_CONNECTION_ID $ordersMcpConnectionId
     & azd env set COURIER_PREFERENCES_SKILL_VERSION $versions['courier-preferences']
     & azd env set DELIVERY_COORDINATION_SKILL_VERSION $versions['delivery-coordination']
     & azd env set PREFERENCE_CHANGE_APPROVAL_SKILL_VERSION $versions['preference-change-approval']

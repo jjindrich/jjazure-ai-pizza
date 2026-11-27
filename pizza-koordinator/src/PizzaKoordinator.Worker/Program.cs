@@ -1,10 +1,12 @@
 extern alias AzureIdentity;
 
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using Azure.Core;
 using Microsoft.Identity.Web;
 using Microsoft.Teams.Apps;
-using PizzaKoordinator.Api;
+using PizzaKoordinator.Worker;
+
+// ACA Sandbox Worker behind Private Link. Only the DMZ Gateway's identity may call it.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +16,7 @@ if (!localBypass)
 {
     var missing = new[] { (nameof(options.FoundryEndpoint), options.FoundryEndpoint), (nameof(options.OrdersApiUrl), options.OrdersApiUrl),
             (nameof(options.AllowedTenantId), options.AllowedTenantId), (nameof(options.ToolAudience), options.ToolAudience),
-            (nameof(options.ToolClientId), options.ToolClientId), (nameof(options.AdminAadObjectId), options.AdminAadObjectId) }
+            (nameof(options.GatewayClientId), options.GatewayClientId), (nameof(options.AdminAadObjectId), options.AdminAadObjectId) }
         .Where(x => string.IsNullOrWhiteSpace(x.Item2)).Select(x => x.Item1).ToArray();
     if (missing.Length > 0 || options.Couriers.Count == 0)
         throw new InvalidOperationException($"PizzaKoordinator configuration is incomplete: {string.Join(", ", missing.Append(options.Couriers.Count == 0 ? "Couriers" : null).OfType<string>())}.");
@@ -31,56 +33,36 @@ builder.Services.AddHttpClient<OrdersClient>(http => http.BaseAddress = new Uri(
 builder.Services.AddSingleton<CoordinatorState>();
 builder.Services.AddSingleton<FoundryAgent>();
 builder.Services.AddSingleton<FoundrySkills>();
-builder.Services.AddSingleton<GraphClient>();
+builder.Services.AddSingleton<IGraphClient, GraphClient>();
 builder.Services.AddSingleton<Coordinator>();
 builder.Services.AddHostedService<OrderWatcher>();
+builder.Services.AddSingleton<TeamsInbox>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TeamsInbox>());
 builder.Services.AddHealthChecks();
+// Outbound only (replies, channel posts, agentic Graph tokens); Teams ingress lives in the Gateway.
 builder.Services.AddTeamsBotApplication("AzureAd");
 builder.Services.AddAuthentication().AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("ToolApi"), "Tools");
-builder.Services.AddAuthorization(auth => auth.AddPolicy("tools", policy =>
+builder.Services.AddAuthorization(auth => auth.AddPolicy("gateway", policy =>
 {
     if (localBypass) { policy.RequireAssertion(_ => true); return; }
     policy.AddAuthenticationSchemes("Tools").RequireAuthenticatedUser()
-        .RequireAssertion(ctx => options.IsToolCaller(ctx.User));
+        .RequireAssertion(ctx => options.IsGatewayCaller(ctx.User));
 }));
 
 var app = builder.Build();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
-app.UseTeamsBotApplication("api/messages");
 
-var tools = app.MapGroup("/v1").RequireAuthorization("tools");
+var gateway = app.MapGroup("").RequireAuthorization("gateway");
+var inbox = app.Services.GetRequiredService<TeamsInbox>();
 var state = app.Services.GetRequiredService<CoordinatorState>();
 var coordinator = app.Services.GetRequiredService<Coordinator>();
-tools.MapGet("/deliveries", () => state.Snapshot());
-tools.MapPost("/deliveries/assign", (AssignRequest request, CancellationToken ct) => coordinator.AssignAsync(request, ct));
-tools.MapPost("/deliveries/complete", (CompleteRequest request, CancellationToken ct) => coordinator.CompleteAsync(request, ct));
-tools.MapPost("/preference-changes", (ProposeRequest request, CancellationToken ct) => coordinator.ProposeAsync(request, ct));
-
-var decision = new Regex(@"\b(schval\w*|approve\w*|zamit\w*|reject\w*)\s+([0-9a-f]{6})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-var mention = new Regex("<at>.*?</at>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-app.Services.GetRequiredService<TeamsBotApplication>().OnMessage(async (context, ct) =>
-{
-    var sender = coordinator.Capture(context.Activity);
-    var text = mention.Replace(context.Activity.Text ?? "", "").Trim();
-    if (text.Length == 0) return;
-
-    if (decision.Match(text) is { Success: true } match)
-    {
-        var approve = match.Groups[1].Value.StartsWith("schval", StringComparison.OrdinalIgnoreCase)
-            || match.Groups[1].Value.StartsWith("approve", StringComparison.OrdinalIgnoreCase);
-        await context.SendAsync(await coordinator.DecideAsync(sender, approve, match.Groups[2].Value, ct), ct);
-        return;
-    }
-
-    var courier = options.FindSender(sender.AadObjectId, sender.Name);
-    if (courier is not null) state.CourierActivity();
-    var role = courier is not null ? $"kuryr {courier.Name}" : options.IsAdmin(sender.AadObjectId) ? "admin" : "jiny uzivatel";
-    await context.SendAsync(await coordinator.AskAsync($"""
-        ZPRAVA_Z_TEAMS
-        Odesilatel: {sender.Name} (role: {role})
-        Text: {text}
-        """, ct), ct);
-});
+gateway.MapPost("/internal/teams/activities", (JsonElement activity) =>
+    inbox.TryEnqueue(activity) ? Results.Accepted() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
+gateway.MapGet("/v1/deliveries", () => state.Snapshot());
+gateway.MapPost("/v1/deliveries/assign", (AssignRequest request, CancellationToken ct) => coordinator.AssignAsync(request, ct));
+gateway.MapPost("/v1/deliveries/complete", (CompleteRequest request, CancellationToken ct) => coordinator.CompleteAsync(request, ct));
+gateway.MapPost("/v1/meetings", (ScheduleMeetingRequest request, CancellationToken ct) => coordinator.ScheduleMeetingAsync(request, ct));
+gateway.MapPost("/v1/preference-changes", (ProposeRequest request, CancellationToken ct) => coordinator.ProposeAsync(request, ct));
 
 await app.RunAsync();

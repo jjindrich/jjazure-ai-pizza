@@ -1,9 +1,9 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
     [string]$SourceCheckout = (Join-Path (Join-Path $PSScriptRoot '..') '.local\agent-demos'),
-    [string]$OwnerId = '63963f49-be4b-46ca-8d95-fa33e9777a22',
-    [string]$BlueprintId = 'd935a216-c452-4e0b-93e9-96ef4141d64e',
-    [string]$TenantId = 'b48accae-439a-467a-9fbf-8ad011508424',
+    [string]$OwnerId = $env:PIZZAOPS_SPONSOR_ID,
+    [string]$BlueprintId = $env:PIZZAOPS_BLUEPRINT_ID,
+    [string]$TenantId = $env:AZURE_TENANT_ID,
     [ValidatePattern('^[a-z0-9][a-z0-9-]{0,62}$')]
     [string]$InstanceName = 'pizzaops',
     [string]$AgentUpn = 'pizzaops@jjazdev.org',
@@ -83,15 +83,7 @@ if (Test-Path -LiteralPath $bindingPath) {
     }
 }
 elseif (Test-Path -LiteralPath $state) {
-    $savedState = Get-Content -LiteralPath $state -Raw | ConvertFrom-Json
-    if ($InstanceName -ne 'pizzaops' -or
-        $AgentUpn -ine 'pizzaops@jjazdev.org' -or
-        $TenantId -ine 'b48accae-439a-467a-9fbf-8ad011508424' -or
-        $BlueprintId -ine 'd935a216-c452-4e0b-93e9-96ef4141d64e' -or
-        $OwnerId -ine '63963f49-be4b-46ca-8d95-fa33e9777a22' -or
-        $savedState.agentUserPrincipalName -ine $AgentUpn) {
-        throw "Unbound existing state '$state' cannot be safely matched to this request. Preserve it and investigate before continuing."
-    }
+    throw "Unbound existing state '$state' cannot be safely matched. Preserve it and verify its original tenant, blueprint, sponsor and UPN before restoring a binding."
 }
 
 if (($WhatIfPreference -or -not $DryRun) -and -not $PSCmdlet.ShouldProcess(
